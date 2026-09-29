@@ -4,6 +4,8 @@ import AppKit
 public final class AlbumView: NSView {
     public let image: NSImage?
     public var onDoubleClick: (() -> Void)?
+    /// Called on every click, before dragging or playing.
+    public var onMouseDown: (() -> Void)?
 
     public init(image: NSImage?) {
         self.image = image
@@ -29,6 +31,7 @@ public final class AlbumView: NSView {
     public override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     public override func mouseDown(with event: NSEvent) {
+        onMouseDown?()
         if event.clickCount == 2 {
             onDoubleClick?()
         } else {

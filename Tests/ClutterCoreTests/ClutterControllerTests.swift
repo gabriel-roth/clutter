@@ -27,11 +27,6 @@ private func album(_ id: String, title: String? = nil) -> Album {
 }
 private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
 
-@MainActor
-private func becomeKey(_ window: NSWindow, in controller: ClutterController) {
-    controller.windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification, object: window))
-}
-
 @MainActor @Test func firstLaunchStartsEmpty() {
     let store = makeStore()
     #expect(makeController(store: store).windows.isEmpty)
@@ -153,9 +148,19 @@ private func becomeKey(_ window: NSWindow, in controller: ClutterController) {
     let store = makeStore()
     store.save(Library(entries: [a, b, c].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
     let controller = makeController(store: store)
-    becomeKey(controller.windows[0], in: controller)
+    controller.windows[0].albumView.onMouseDown?()
     #expect(controller.windows.map(\.album) == [b, c, a])
     #expect(store.load()?.entries.map(\.album) == [b, c, a])
+}
+
+@MainActor @Test func clickingTheFrontmostCoverChangesNothing() {
+    let store = makeStore()
+    let saved = Library(entries: [a, b, c].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) })
+    store.save(saved)
+    let controller = makeController(store: store)
+    controller.windows[2].albumView.onMouseDown?()
+    #expect(controller.windows.map(\.album) == [a, b, c])
+    #expect(store.load() == saved)
 }
 
 @MainActor @Test func bringToFrontMovesThatCoverToTheTop() {

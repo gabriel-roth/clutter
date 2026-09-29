@@ -67,15 +67,18 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public func apply(_ albums: [Album]) {
         library.reconcile(with: albums, newOrigin: randomOrigin)
         store.save(library)
-        var unused = Dictionary(uniqueKeysWithValues: windows.map { ($0.album.spotifyURI, $0) })
+        let old = windows
+        var candidates = Dictionary(old.map { ($0.album.spotifyURI, $0) }, uniquingKeysWith: { first, _ in first })
+        var reused = Set<ObjectIdentifier>()
         windows = library.entries.map { entry in
-            if let window = unused[entry.album.spotifyURI], window.album == entry.album {
-                unused[entry.album.spotifyURI] = nil
+            if let window = candidates[entry.album.spotifyURI], window.album == entry.album {
+                candidates[entry.album.spotifyURI] = nil
+                reused.insert(ObjectIdentifier(window))
                 return window
             }
             return makeWindow(for: entry)
         }
-        unused.values.forEach(close)
+        old.filter { !reused.contains(ObjectIdentifier($0)) }.forEach(close)
         showWindows()
     }
 
@@ -90,12 +93,6 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         guard let window = notification.object as? AlbumWindow else { return }
         library.move(spotifyURI: window.album.spotifyURI, to: window.frame.origin)
         store.save(library)
-    }
-
-    /// A clicked cover comes to the front; remember that.
-    public func windowDidBecomeKey(_ notification: Notification) {
-        guard let window = notification.object as? AlbumWindow else { return }
-        moveToFront(window)
     }
 
     private func moveToFront(_ window: AlbumWindow) {
@@ -114,6 +111,9 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         let album = entry.album
         let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: frame(at: entry.origin))
         window.albumView.onDoubleClick = { [player] in player.play(album) }
+        window.albumView.onMouseDown = { [weak self, weak window] in
+            if let self, let window { self.moveToFront(window) }
+        }
         window.delegate = self
         return window
     }

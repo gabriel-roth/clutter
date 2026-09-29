@@ -26,6 +26,16 @@ private func mouseDown(clickCount: Int) -> NSEvent {
     #expect(fired == 0)
 }
 
+@MainActor @Test func everyClickFiresOnMouseDown() {
+    let view = AlbumView(image: nil)
+    var fired = 0
+    view.onMouseDown = { fired += 1 }
+    view.mouseDown(with: mouseDown(clickCount: 1))
+    #expect(fired == 1)
+    view.mouseDown(with: mouseDown(clickCount: 2))
+    #expect(fired == 2)
+}
+
 @MainActor @Test func viewDrawsWithoutArtwork() {
     let view = AlbumView(image: nil)
     view.frame = CGRect(x: 0, y: 0, width: 50, height: 50)
