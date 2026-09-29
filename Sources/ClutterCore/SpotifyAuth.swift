@@ -15,7 +15,7 @@ public struct SpotifyAuthConfig: Sendable {
     public static let clutter = SpotifyAuthConfig(
         clientID: "45ae3a8fba3f4d4f801fbeaf67a64b03",
         redirectURI: "clutter://callback",
-        scopes: ["user-library-read"]
+        scopes: ["user-library-read", "user-library-modify"]
     )
 
     /// The scheme of `redirectURI`, which the web sign-in session watches for.
@@ -49,8 +49,10 @@ public actor SpotifyAuth {
         self.now = now
     }
 
+    /// False when the saved sign-in lacks a scope Clutter now needs, so the user is asked to sign in again.
     public var isSignedIn: Bool {
-        store.load() != nil
+        guard let scopes = store.load()?.scopes else { return false }
+        return Set(config.scopes).isSubset(of: scopes)
     }
 
     public nonisolated func authorizationURL(pkce: PKCE, state: String) -> URL {
@@ -98,7 +100,7 @@ public actor SpotifyAuth {
             "redirect_uri": config.redirectURI,
             "client_id": config.clientID,
             "code_verifier": pkce.verifier,
-        ], previousRefreshToken: nil)
+        ], previous: nil)
         try store.save(tokens)
     }
 
@@ -128,7 +130,7 @@ public actor SpotifyAuth {
                 "grant_type": "refresh_token",
                 "refresh_token": tokens.refreshToken,
                 "client_id": config.clientID,
-            ], previousRefreshToken: tokens.refreshToken)
+            ], previous: tokens)
             try store.save(refreshed)
             return refreshed
         } catch SpotifyAuthError.tokenRequestFailed(let status, let body) where status == 400 && body.contains(#""invalid_grant""#) {
@@ -141,7 +143,7 @@ public actor SpotifyAuth {
         }
     }
 
-    private func requestTokens(_ form: [String: String], previousRefreshToken: String?) async throws -> SpotifyTokens {
+    private func requestTokens(_ form: [String: String], previous: SpotifyTokens?) async throws -> SpotifyTokens {
         var request = URLRequest(url: Self.tokenEndpoint)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -155,7 +157,7 @@ public actor SpotifyAuth {
         guard let reply = try? JSONDecoder().decode(TokenResponse.self, from: data) else {
             throw SpotifyAuthError.malformedTokenResponse
         }
-        return try reply.tokens(receivedAt: now(), previousRefreshToken: previousRefreshToken)
+        return try reply.tokens(receivedAt: now(), previousRefreshToken: previous?.refreshToken, previousScopes: previous?.scopes)
     }
 
     static func formBody(_ form: [String: String]) -> Data {

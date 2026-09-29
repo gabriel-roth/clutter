@@ -29,7 +29,7 @@ private let approve: @Sendable (URL) async throws -> URL = { url in
 @Test func clutterSignsInAsItsOwnSpotifyApp() {
     #expect(SpotifyAuthConfig.clutter.clientID == "45ae3a8fba3f4d4f801fbeaf67a64b03")
     #expect(SpotifyAuthConfig.clutter.redirectURI == "clutter://callback")
-    #expect(SpotifyAuthConfig.clutter.scopes == ["user-library-read"])
+    #expect(SpotifyAuthConfig.clutter.scopes == ["user-library-read", "user-library-modify"])
     #expect(SpotifyAuthConfig.clutter.callbackScheme == "clutter")
 }
 
@@ -72,6 +72,21 @@ private let approve: @Sendable (URL) async throws -> URL = { url in
     }
 }
 
+@Test func tokensWithoutEveryScopeCountAsSignedOut() async {
+    let store = MemoryTokenStore(SpotifyTokens(accessToken: "AT", refreshToken: "RT", expiresAt: t0 + 3600, scopes: ["something-else"]))
+    #expect(await makeAuth(store: store, http: FakeHTTP([])).isSignedIn == false)
+}
+
+@Test func tokensWithNoRecordedScopesCountAsSignedOut() async {
+    let store = MemoryTokenStore(SpotifyTokens(accessToken: "AT", refreshToken: "RT", expiresAt: t0 + 3600))
+    #expect(await makeAuth(store: store, http: FakeHTTP([])).isSignedIn == false)
+}
+
+@Test func tokensWithEveryScopeCountAsSignedIn() async {
+    let store = MemoryTokenStore(SpotifyTokens(accessToken: "AT", refreshToken: "RT", expiresAt: t0 + 3600, scopes: ["user-library-read", "extra"]))
+    #expect(await makeAuth(store: store, http: FakeHTTP([])).isSignedIn)
+}
+
 @Test func signInExchangesTheCodeAndSavesTheTokens() async throws {
     let store = MemoryTokenStore()
     let http = FakeHTTP([(200, tokenJSON)])
@@ -93,7 +108,7 @@ private let approve: @Sendable (URL) async throws -> URL = { url in
     #expect(form["client_id"] == "CLIENT")
     let challenge = try #require(authorizeURL.value.map { queryItems($0)["code_challenge"] })
     #expect(PKCE(verifier: form["code_verifier"] ?? "").challenge == challenge)
-    #expect(store.load() == SpotifyTokens(accessToken: "AT", refreshToken: "RT", expiresAt: t0 + 3600))
+    #expect(store.load() == SpotifyTokens(accessToken: "AT", refreshToken: "RT", expiresAt: t0 + 3600, scopes: ["user-library-read"]))
     #expect(await auth.isSignedIn)
 }
 
@@ -127,7 +142,7 @@ private let approve: @Sendable (URL) async throws -> URL = { url in
     let http = FakeHTTP([(200, #"{"access_token":"NEW","token_type":"Bearer","expires_in":3600}"#)])
     #expect(try await makeAuth(store: store, http: http).validAccessToken() == "NEW")
     #expect(formFields(http.recorded[0]) == ["grant_type": "refresh_token", "refresh_token": "RT", "client_id": "CLIENT"])
-    #expect(store.load() == SpotifyTokens(accessToken: "NEW", refreshToken: "RT", expiresAt: t0 + 3600))
+    #expect(store.load() == SpotifyTokens(accessToken: "NEW", refreshToken: "RT", expiresAt: t0 + 3600, scopes: nil))
 }
 
 @Test func refreshKeepsANewRefreshTokenWhenSpotifySendsOne() async throws {
