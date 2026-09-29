@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var closeAboutOnCommandW: Any?
     private var sync: LibrarySync?
     private var statusItem: NSStatusItem?
-    private var statusMenu: NSMenu?
+    private var statusClickMonitor: Any?
     private lazy var settings = SettingsWindowController(
         albumCount: AlbumCount.saved(in: .standard),
         showsInfoOnHover: HoverInfo.isEnabled(in: .standard),
@@ -60,19 +60,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         item.button?.image = NSImage(systemSymbolName: "square.stack", accessibilityDescription: "Clutter")
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked(_:))
-        statusMenu = menu
         statusItem = item
+        // The system claims Command-clicks on menu bar icons (for rearranging them) and never sends the
+        // button's action, but the mouse-down still reaches the app, so catch it here.
+        statusClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak item] event in
+            guard let button = item?.button, event.window === button.window,
+                  event.modifierFlags.contains(.command) else { return event }
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+            return nil
+        }
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        // The event that reaches the button can arrive with its modifier flags stripped, so also check the keyboard state.
-        let commandDown = NSApp.currentEvent?.modifierFlags.contains(.command) == true || NSEvent.modifierFlags.contains(.command)
-        guard let controller else { return }
-        if commandDown, let menu = statusMenu {
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
-        } else {
-            controller.setHidden(!controller.isHidden)
-        }
+        controller?.setHidden(!(controller?.isHidden ?? true))
     }
 
     @objc func showAbout(_ sender: Any?) {
