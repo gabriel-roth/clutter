@@ -65,12 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        guard let controller, let statusItem else { return }
-        if NSApp.currentEvent?.modifierFlags.contains(.command) == true, let menu = statusMenu {
-            // Attaching the menu only for this click keeps plain clicks routed to the action.
-            statusItem.menu = menu
-            sender.performClick(nil)
-            statusItem.menu = nil
+        // The event that reaches the button can arrive with its modifier flags stripped, so also check the keyboard state.
+        let commandDown = NSApp.currentEvent?.modifierFlags.contains(.command) == true || NSEvent.modifierFlags.contains(.command)
+        guard let controller else { return }
+        if commandDown, let menu = statusMenu {
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
         } else {
             controller.setHidden(!controller.isHidden)
         }
