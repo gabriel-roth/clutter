@@ -37,3 +37,58 @@ final class SpyPlayer: SpotifyPlayer {
     var played: [Album] = []
     func play(_ album: Album) { played.append(album) }
 }
+
+/// A thread-safe box for values captured by `@Sendable` test closures.
+final class Box<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value
+
+    init(_ value: Value) {
+        stored = value
+    }
+
+    var value: Value {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
+    }
+}
+
+/// Answers HTTP requests with canned (status, body) replies in order and records every request.
+/// Throws once the replies run out, so an unexpected call fails the test.
+final class FakeHTTP: @unchecked Sendable {
+    private let lock = NSLock()
+    private var replies: [(status: Int, body: String)]
+    private var requests: [URLRequest] = []
+
+    init(_ replies: [(status: Int, body: String)]) {
+        self.replies = replies
+    }
+
+    var recorded: [URLRequest] {
+        lock.withLock { requests }
+    }
+
+    func handle(_ request: URLRequest) throws -> (Data, URLResponse) {
+        try lock.withLock {
+            requests.append(request)
+            guard !replies.isEmpty else { throw URLError(.resourceUnavailable) }
+            let reply = replies.removeFirst()
+            let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: nil)!
+            return (Data(reply.body.utf8), response)
+        }
+    }
+}
+
+/// Keeps tokens in memory instead of the Keychain.
+final class MemoryTokenStore: SpotifyTokenStore, @unchecked Sendable {
+    private let lock = NSLock()
+    private var tokens: SpotifyTokens?
+
+    init(_ tokens: SpotifyTokens? = nil) {
+        self.tokens = tokens
+    }
+
+    func load() -> SpotifyTokens? { lock.withLock { tokens } }
+    func save(_ tokens: SpotifyTokens) throws { lock.withLock { self.tokens = tokens } }
+    func delete() { lock.withLock { tokens = nil } }
+}
