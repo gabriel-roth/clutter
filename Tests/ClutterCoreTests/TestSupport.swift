@@ -1,4 +1,5 @@
 import AppKit
+@testable import ClutterCore
 
 /// A fresh, empty directory path that doesn't exist yet.
 func temporaryDirectory() -> URL {
@@ -29,4 +30,10 @@ struct SeededGenerator: RandomNumberGenerator {
         z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
         return z ^ (z >> 31)
     }
+}
+
+@MainActor
+final class SpyPlayer: SpotifyPlayer {
+    var played: [Album] = []
+    func play(_ album: Album) { played.append(album) }
 }

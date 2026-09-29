@@ -5,10 +5,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controller: ClutterController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let visibleFrame = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-        let controller = ClutterController(albums: Album.starters, player: AppleScriptSpotifyPlayer(), visibleFrame: visibleFrame) { album in
-            Bundle.main.image(forResource: album.artworkName)
-        }
+        let support = LibraryStore.defaultDirectory
+        let screens = NSScreen.screens.map(\.visibleFrame)
+        let controller = ClutterController(
+            store: LibraryStore(fileURL: support.appending(path: "library.json")),
+            artwork: ArtworkStore(directory: support.appending(path: "Artwork", directoryHint: .isDirectory)),
+            player: AppleScriptSpotifyPlayer(),
+            screens: screens.isEmpty ? [CGRect(x: 0, y: 0, width: 1440, height: 900)] : screens
+        )
         controller.showWindows()
         self.controller = controller
     }
