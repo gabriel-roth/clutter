@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let artwork = ArtworkStore(directory: LibraryStore.defaultDirectory.appending(path: "Artwork", directoryHint: .isDirectory))
     private var controller: ClutterController?
     private lazy var settings = SettingsWindowController()
+    private let spotifySignIn = SpotifySignIn(auth: SpotifyAuth())
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let screens = NSScreen.screens.map(\.visibleFrame)
@@ -19,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         )
         controller.showWindows()
         self.controller = controller
+        Task { await spotifySignIn.promptIfSignedOut() }
         KeyboardShortcuts.onKeyUp(for: .addCurrentAlbum) { [weak self] in
             self?.addCurrentAlbum(nil)
         }
