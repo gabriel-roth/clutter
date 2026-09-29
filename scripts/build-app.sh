@@ -16,5 +16,9 @@ cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 for bundle in "$PRODUCTS"/*.bundle; do
     [ -e "$bundle" ] && cp -R "$bundle" "$APP/Contents/Resources/"
 done
-codesign --force --sign - "$APP"
+# Sign with an Apple Development certificate if there is one (Xcode › Settings › Accounts ›
+# Manage Certificates). Its Team ID keeps the Keychain item holding the Spotify sign-in readable by
+# every rebuild; an ad hoc signature changes with each build, so macOS asks for the login password.
+IDENTITY=$(security find-identity -v -p codesigning | awk '/"Apple Development/ { print $2; exit }')
+codesign --force --sign "${IDENTITY:--}" "$APP"
 echo "Built $APP"
