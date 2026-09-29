@@ -37,17 +37,14 @@ final class SpotifySignIn: NSObject, ASWebAuthenticationPresentationContextProvi
     private func authorize(_ url: URL) async throws -> URL {
         defer { session = nil }
         return try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: SpotifyAuthConfig.clutter.callbackScheme) { callback, error in
-                if let callback {
-                    continuation.resume(returning: callback)
-                } else {
-                    continuation.resume(throwing: error ?? SpotifyAuthError.missingCode)
-                }
-            }
+            let completion = webAuthenticationCompletion(resuming: continuation)
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: SpotifyAuthConfig.clutter.callbackScheme, completionHandler: completion)
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             self.session = session
-            session.start()
+            if !session.start() {
+                completion(nil, ASWebAuthenticationSessionError(.presentationContextNotProvided))
+            }
         }
     }
 
