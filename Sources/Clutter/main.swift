@@ -115,6 +115,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
+    @objc func tidyCovers(_ sender: Any?) {
+        controller?.tidy()
+    }
+
+    @objc func scrambleCovers(_ sender: Any?) {
+        controller?.scramble()
+    }
+
     @objc func showSettings(_ sender: Any?) {
         settings.show()
     }
@@ -206,6 +214,11 @@ let fileMenuItem = NSMenuItem()
 fileMenuItem.submenu = fileMenu
 mainMenu.addItem(fileMenuItem)
 
+let arrangeCommands = [
+    ("Tidy", #selector(AppDelegate.tidyCovers(_:))),
+    ("Scramble", #selector(AppDelegate.scrambleCovers(_:))),
+]
+
 // Covers are borderless, so keep AppKit from adding "Enter Full Screen" to the View menu.
 UserDefaults.standard.set(false, forKey: "NSFullScreenMenuItemEverywhere")
 let viewMenu = NSMenu(title: "View")
@@ -213,6 +226,12 @@ for size in CoverSize.allCases {
     let item = NSMenuItem(title: size.title, action: #selector(AppDelegate.setCoverSize(_:)), keyEquivalent: "")
     item.target = delegate
     item.representedObject = size.rawValue
+    viewMenu.addItem(item)
+}
+viewMenu.addItem(.separator())
+for (title, action) in arrangeCommands {
+    let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+    item.target = delegate
     viewMenu.addItem(item)
 }
 let viewMenuItem = NSMenuItem()
@@ -237,6 +256,11 @@ for size in CoverSize.allCases {
 let sizeMenuItem = NSMenuItem(title: "Cover Size", action: nil, keyEquivalent: "")
 sizeMenuItem.submenu = sizeMenu
 statusMenu.addItem(sizeMenuItem)
+for (title, action) in arrangeCommands {
+    let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+    item.target = delegate
+    statusMenu.addItem(item)
+}
 let statusSettingsItem = NSMenuItem(title: "Settings…", action: #selector(AppDelegate.showSettings(_:)), keyEquivalent: ",")
 statusSettingsItem.target = delegate
 statusMenu.addItem(statusSettingsItem)

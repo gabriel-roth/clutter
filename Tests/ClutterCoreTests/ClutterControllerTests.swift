@@ -325,3 +325,32 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     controller.toggle()
     #expect(!controller.isHidden)
 }
+
+@MainActor @Test func tidyLinesCoversUpInAGridNearWhereTheyWere() {
+    let store = makeStore()
+    store.save(Library(entries: [
+        .init(album: a, origin: CGPoint(x: 70, y: 40)),
+        .init(album: b, origin: CGPoint(x: 300, y: 60)),
+        .init(album: c, origin: CGPoint(x: 90, y: 400)),
+    ]))
+    let controller = makeController(store: store)
+    controller.tidy()
+    let origins = controller.windows.map(\.frame.origin)
+    #expect(origins == [CGPoint(x: 60, y: 132), CGPoint(x: 280, y: 132), CGPoint(x: 60, y: 352)])
+    #expect(store.load()?.entries.map(\.origin) == origins)
+    #expect(controller.windows.map(\.album) == [a, b, c])
+}
+
+@MainActor @Test func scrambleMovesCoversToNewSpotsOnScreenAndKeepsTheOrder() {
+    let store = makeStore()
+    let start = [CGPoint(x: 100, y: 100), CGPoint(x: 400, y: 300), CGPoint(x: 700, y: 500)]
+    store.save(Library(entries: zip([a, b, c], start).map { .init(album: $0, origin: $1) }))
+    let controller = makeController(store: store)
+    controller.scramble()
+    let origins = controller.windows.map(\.frame.origin)
+    #expect(origins != start)
+    #expect(Set(origins.map { "\($0.x),\($0.y)" }).count == 3)
+    #expect(controller.windows.allSatisfy { screen.contains($0.frame) })
+    #expect(store.load()?.entries.map(\.origin) == origins)
+    #expect(controller.windows.map(\.album) == [a, b, c])
+}

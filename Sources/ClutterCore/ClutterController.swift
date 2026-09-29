@@ -103,6 +103,26 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         store.save(library)
     }
 
+    /// Lines every cover up in a grid, each as near as it can get to where it was.
+    public func tidy() {
+        let origins = Placement.tidyOrigins(of: windows.map(\.frame.origin), size: coverSize.points, on: screens)
+        place(origins)
+    }
+
+    /// Moves every cover to a new random spot, leaving the stacking order alone.
+    public func scramble() {
+        place(windows.map { _ in randomOrigin() })
+    }
+
+    /// Moves each cover to the matching origin, in stacking order, and saves the positions.
+    private func place(_ origins: [CGPoint]) {
+        for (window, origin) in zip(windows, origins) {
+            window.setFrame(frame(at: origin), display: true)
+            library.move(spotifyURI: window.album.spotifyURI, to: origin)
+        }
+        store.save(library)
+    }
+
     /// Turns the artist-and-title hover overlay on or off for every cover.
     public func setShowsInfoOnHover(_ showsInfo: Bool) {
         showsInfoOnHover = showsInfo
