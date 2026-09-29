@@ -49,6 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 sync.startPolling(every: .seconds(30))
             }
         }
+        KeyboardShortcuts.onKeyUp(for: .toggleClutter) { [weak self] in
+            guard let controller = self?.controller else { return }
+            controller.setHidden(!controller.isHidden)
+        }
         KeyboardShortcuts.onKeyUp(for: .addCurrentAlbum) { [weak self] in
             self?.addCurrentAlbum(nil)
         }

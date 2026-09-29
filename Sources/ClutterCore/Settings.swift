@@ -4,6 +4,8 @@ import KeyboardShortcuts
 extension KeyboardShortcuts.Name {
     /// Global shortcut for adding the album Spotify is playing. No default.
     public static let addCurrentAlbum = Self("addCurrentAlbum")
+    /// Global shortcut for showing or hiding the covers. No default.
+    public static let toggleClutter = Self("toggleClutter")
 }
 
 /// Closes on Command-W itself, since the menu bar has no Close item.
@@ -17,8 +19,8 @@ private final class SettingsWindow: NSWindow {
     }
 }
 
-/// A small window for choosing how many albums to show, whether hovering shows album info, and the
-/// global "add current album" shortcut.
+/// A small window for choosing the global shortcuts for showing or hiding the covers and for adding
+/// the current album, how many albums to show, and whether hovering shows album info.
 @MainActor
 public final class SettingsWindowController: NSObject {
     /// How long the album count must stay unchanged before it's reported, so stepping from 10 to 15
@@ -80,14 +82,19 @@ public final class SettingsWindowController: NSObject {
         showsInfoOnHoverCheckbox.target = self
         showsInfoOnHoverCheckbox.action = #selector(showsInfoOnHoverChanged(_:))
 
-        let shortcutRow = NSStackView(views: [
-            NSTextField(labelWithString: "Add currently playing album"),
-            KeyboardShortcuts.RecorderCocoa(for: .addCurrentAlbum),
-        ])
-        shortcutRow.orientation = .horizontal
-        shortcutRow.spacing = 8
+        func shortcutRow(_ title: String, _ name: KeyboardShortcuts.Name) -> NSStackView {
+            let row = NSStackView(views: [NSTextField(labelWithString: title), KeyboardShortcuts.RecorderCocoa(for: name)])
+            row.orientation = .horizontal
+            row.spacing = 8
+            return row
+        }
 
-        let rows = NSStackView(views: [countRow, showsInfoOnHoverCheckbox, shortcutRow])
+        let rows = NSStackView(views: [
+            shortcutRow("Show/hide Clutter", .toggleClutter),
+            shortcutRow("Add currently playing album", .addCurrentAlbum),
+            countRow,
+            showsInfoOnHoverCheckbox,
+        ])
         rows.orientation = .vertical
         rows.alignment = .leading
         rows.spacing = 12

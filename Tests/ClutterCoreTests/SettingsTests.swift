@@ -13,7 +13,7 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     let settings = SettingsWindowController(albumCount: 10, onAlbumCountChange: { _ in })
     #expect(settings.window.title == "Clutter settings")
     #expect(settings.window.styleMask.contains(.closable))
-    #expect(allSubviews(of: settings.window.contentView).compactMap { $0 as? KeyboardShortcuts.RecorderCocoa }.count == 1)
+    #expect(allSubviews(of: settings.window.contentView).compactMap { $0 as? KeyboardShortcuts.RecorderCocoa }.count == 2)
 }
 
 @MainActor @Test func albumCountControlsShowTheCurrentCountWithinRange() {
@@ -113,6 +113,10 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     try await Task.sleep(for: SettingsWindowController.changeDelay + .milliseconds(300))
     settings.fieldChanged(settings.albumCountField)
     #expect(reported == [25])
+}
+
+@Test func toggleClutterShortcutName() {
+    #expect(KeyboardShortcuts.Name.toggleClutter.rawValue == "toggleClutter")
 }
 
 @Test func addCurrentAlbumShortcutName() {
