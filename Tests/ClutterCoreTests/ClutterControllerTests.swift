@@ -236,3 +236,16 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     #expect(order.filter(ours.contains) == ours)
     controller.apply([])
 }
+
+@MainActor @Test func hoverInfoSettingReachesEveryCoverIncludingNewOnes() {
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 100, y: 300))]))
+    let controller = ClutterController(store: store, artwork: ArtworkStore(directory: temporaryDirectory()), player: SpyPlayer(), screens: [screen], showsInfoOnHover: false, rng: SeededGenerator(seed: 3))
+    #expect(controller.windows.allSatisfy { !$0.albumView.showsInfoOnHover })
+    controller.setShowsInfoOnHover(true)
+    controller.apply([b, a])
+    #expect(controller.windows.count == 2)
+    #expect(controller.windows.allSatisfy { $0.albumView.showsInfoOnHover })
+    controller.setShowsInfoOnHover(false)
+    #expect(controller.windows.allSatisfy { !$0.albumView.showsInfoOnHover })
+}

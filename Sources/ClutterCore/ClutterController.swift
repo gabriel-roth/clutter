@@ -6,6 +6,7 @@ import AppKit
 public final class ClutterController: NSObject, NSWindowDelegate {
     public private(set) var library: Library
     public private(set) var coverSize: CoverSize
+    public private(set) var showsInfoOnHover: Bool
     /// In stacking order, back to front, matching `library.entries`.
     public private(set) var windows: [AlbumWindow] = []
 
@@ -22,6 +23,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         player: SpotifyPlayer,
         screens: [CGRect],
         coverSize: CoverSize = .medium,
+        showsInfoOnHover: Bool = true,
         rng: any RandomNumberGenerator = SystemRandomNumberGenerator()
     ) {
         self.store = store
@@ -29,6 +31,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         self.player = player
         self.screens = screens
         self.coverSize = coverSize
+        self.showsInfoOnHover = showsInfoOnHover
         self.rng = rng
         self.library = Library()
         super.init()
@@ -62,6 +65,12 @@ public final class ClutterController: NSObject, NSWindowDelegate {
             library.move(spotifyURI: window.album.spotifyURI, to: origin)
         }
         store.save(library)
+    }
+
+    /// Turns the artist-and-title hover overlay on or off for every cover.
+    public func setShowsInfoOnHover(_ showsInfo: Bool) {
+        showsInfoOnHover = showsInfo
+        windows.forEach { $0.albumView.showsInfoOnHover = showsInfo }
     }
 
     /// Shows exactly `albums` (newest first): covers already shown stay where they are, neither moved
@@ -117,6 +126,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     private func makeWindow(for entry: Library.Entry) -> AlbumWindow {
         let album = entry.album
         let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: frame(at: entry.origin))
+        window.albumView.showsInfoOnHover = showsInfoOnHover
         window.albumView.onDoubleClick = { [player] in player.play(album) }
         window.albumView.onMouseDown = { [weak self, weak window] in
             if let self, let window { self.moveToFront(window) }

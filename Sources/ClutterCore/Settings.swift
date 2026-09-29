@@ -6,7 +6,8 @@ extension KeyboardShortcuts.Name {
     public static let addCurrentAlbum = Self("addCurrentAlbum")
 }
 
-/// A small window for choosing how many albums to show and the global "add current album" shortcut.
+/// A small window for choosing how many albums to show, whether hovering shows album info, and the
+/// global "add current album" shortcut.
 @MainActor
 public final class SettingsWindowController: NSObject {
     /// How long the album count must stay unchanged before it's reported, so stepping from 10 to 15
@@ -16,14 +17,23 @@ public final class SettingsWindowController: NSObject {
     public let window: NSWindow
     let albumCountField = NSTextField()
     let albumCountStepper = NSStepper()
+    let showsInfoOnHoverCheckbox = NSButton(checkboxWithTitle: "Show artist and title on hover", target: nil, action: nil)
     private var albumCount: Int
     private let onAlbumCountChange: @MainActor (Int) -> Void
+    private let onShowsInfoOnHoverChange: @MainActor (Bool) -> Void
     private var pendingChange: Task<Void, Never>?
 
-    /// `onAlbumCountChange` gets the new count once it settles; it's responsible for saving it.
-    public init(albumCount: Int, onAlbumCountChange: @escaping @MainActor (Int) -> Void) {
+    /// `onAlbumCountChange` gets the new count once it settles, and `onShowsInfoOnHoverChange` the
+    /// checkbox's new state right away; each is responsible for saving its setting.
+    public init(
+        albumCount: Int,
+        showsInfoOnHover: Bool = true,
+        onAlbumCountChange: @escaping @MainActor (Int) -> Void = { _ in },
+        onShowsInfoOnHoverChange: @escaping @MainActor (Bool) -> Void = { _ in }
+    ) {
         self.albumCount = albumCount
         self.onAlbumCountChange = onAlbumCountChange
+        self.onShowsInfoOnHoverChange = onShowsInfoOnHoverChange
         window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: true)
         super.init()
 
@@ -51,6 +61,10 @@ public final class SettingsWindowController: NSObject {
         countRow.orientation = .horizontal
         countRow.spacing = 8
 
+        showsInfoOnHoverCheckbox.state = showsInfoOnHover ? .on : .off
+        showsInfoOnHoverCheckbox.target = self
+        showsInfoOnHoverCheckbox.action = #selector(showsInfoOnHoverChanged(_:))
+
         let shortcutRow = NSStackView(views: [
             NSTextField(labelWithString: "Add currently playing album:"),
             KeyboardShortcuts.RecorderCocoa(for: .addCurrentAlbum),
@@ -58,7 +72,7 @@ public final class SettingsWindowController: NSObject {
         shortcutRow.orientation = .horizontal
         shortcutRow.spacing = 8
 
-        let rows = NSStackView(views: [countRow, shortcutRow])
+        let rows = NSStackView(views: [countRow, showsInfoOnHoverCheckbox, shortcutRow])
         rows.orientation = .vertical
         rows.alignment = .leading
         rows.spacing = 12
@@ -86,6 +100,10 @@ public final class SettingsWindowController: NSObject {
             return
         }
         setAlbumCount(value)
+    }
+
+    @objc func showsInfoOnHoverChanged(_ sender: NSButton) {
+        onShowsInfoOnHoverChange(sender.state == .on)
     }
 
     private func setAlbumCount(_ count: Int) {

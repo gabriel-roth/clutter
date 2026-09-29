@@ -7,7 +7,7 @@ public final class AlbumWindow: NSWindow {
 
     public init(album: Album, image: NSImage?, frame: CGRect) {
         self.album = album
-        self.albumView = AlbumView(image: image)
+        self.albumView = AlbumView(image: image, artist: album.artist, title: album.title)
         super.init(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
         contentView = albumView
         hasShadow = true

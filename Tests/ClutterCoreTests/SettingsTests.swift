@@ -97,3 +97,20 @@ private func allSubviews(of view: NSView?) -> [NSView] {
 @Test func addCurrentAlbumShortcutName() {
     #expect(KeyboardShortcuts.Name.addCurrentAlbum.rawValue == "addCurrentAlbum")
 }
+
+@MainActor @Test func hoverInfoCheckboxShowsTheSettingAndReportsChanges() {
+    var reported: [Bool] = []
+    let settings = SettingsWindowController(albumCount: 10, showsInfoOnHover: true, onShowsInfoOnHoverChange: { reported.append($0) })
+    #expect(settings.showsInfoOnHoverCheckbox.state == .on)
+    #expect(allSubviews(of: settings.window.contentView).contains { $0 === settings.showsInfoOnHoverCheckbox })
+    settings.showsInfoOnHoverCheckbox.state = .off
+    settings.showsInfoOnHoverChanged(settings.showsInfoOnHoverCheckbox)
+    settings.showsInfoOnHoverCheckbox.state = .on
+    settings.showsInfoOnHoverChanged(settings.showsInfoOnHoverCheckbox)
+    #expect(reported == [false, true])
+}
+
+@MainActor @Test func hoverInfoCheckboxStartsOffWhenTheSettingIsOff() {
+    let settings = SettingsWindowController(albumCount: 10, showsInfoOnHover: false)
+    #expect(settings.showsInfoOnHoverCheckbox.state == .off)
+}

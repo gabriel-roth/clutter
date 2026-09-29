@@ -10,10 +10,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private lazy var spotifySignIn = SpotifySignIn(auth: auth)
     private var controller: ClutterController?
     private var sync: LibrarySync?
-    private lazy var settings = SettingsWindowController(albumCount: AlbumCount.saved(in: .standard)) { [weak self] count in
-        AlbumCount.save(count, in: .standard)
-        self?.sync?.refresh()
-    }
+    private lazy var settings = SettingsWindowController(
+        albumCount: AlbumCount.saved(in: .standard),
+        showsInfoOnHover: HoverInfo.isEnabled(in: .standard),
+        onAlbumCountChange: { [weak self] count in
+            AlbumCount.save(count, in: .standard)
+            self?.sync?.refresh()
+        },
+        onShowsInfoOnHoverChange: { [weak self] showsInfo in
+            HoverInfo.save(showsInfo, in: .standard)
+            self?.controller?.setShowsInfoOnHover(showsInfo)
+        }
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let screens = NSScreen.screens.map(\.visibleFrame)
@@ -22,7 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             artwork: artwork,
             player: AppleScriptSpotifyPlayer(),
             screens: screens.isEmpty ? [CGRect(x: 0, y: 0, width: 1440, height: 900)] : screens,
-            coverSize: CoverSize.saved(in: .standard)
+            coverSize: CoverSize.saved(in: .standard),
+            showsInfoOnHover: HoverInfo.isEnabled(in: .standard)
         )
         controller.showWindows()
         self.controller = controller
