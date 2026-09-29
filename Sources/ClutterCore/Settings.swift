@@ -6,6 +6,17 @@ extension KeyboardShortcuts.Name {
     public static let addCurrentAlbum = Self("addCurrentAlbum")
 }
 
+/// Closes on Command-W itself, since the menu bar has no Close item.
+private final class SettingsWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if super.performKeyEquivalent(with: event) { return true }
+        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+              event.charactersIgnoringModifiers == "w" else { return false }
+        performClose(nil)
+        return true
+    }
+}
+
 /// A small window for choosing how many albums to show, whether hovering shows album info, and the
 /// global "add current album" shortcut.
 @MainActor
@@ -34,7 +45,7 @@ public final class SettingsWindowController: NSObject {
         self.albumCount = albumCount
         self.onAlbumCountChange = onAlbumCountChange
         self.onShowsInfoOnHoverChange = onShowsInfoOnHoverChange
-        window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: true)
+        window = SettingsWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: true)
         super.init()
 
         let formatter = NumberFormatter()

@@ -125,3 +125,26 @@ private func allSubviews(of view: NSView?) -> [NSView] {
         #expect(rows.bounds.maxX - row.frame.maxX >= 20)
     }
 }
+
+@MainActor
+private func keyDown(_ key: String, _ modifiers: NSEvent.ModifierFlags, in window: NSWindow) -> NSEvent {
+    NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0, windowNumber: window.windowNumber,
+        context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: 13
+    )!
+}
+
+@MainActor @Test func commandWClosesTheSettingsWindow() {
+    let settings = SettingsWindowController(albumCount: 10)
+    settings.window.orderFront(nil)
+    #expect(settings.window.performKeyEquivalent(with: keyDown("w", .command, in: settings.window)))
+    #expect(!settings.window.isVisible)
+}
+
+@MainActor @Test func otherWShortcutsLeaveTheSettingsWindowOpen() {
+    let settings = SettingsWindowController(albumCount: 10)
+    settings.window.orderFront(nil)
+    #expect(!settings.window.performKeyEquivalent(with: keyDown("w", [.command, .option], in: settings.window)))
+    #expect(settings.window.isVisible)
+    settings.window.close()
+}
