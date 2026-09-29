@@ -207,3 +207,15 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
         #expect(screen.contains(window.frame), "\(window.frame) is off screen")
     }
 }
+
+@MainActor @Test func dropsLegacyStarterAlbumsAndSavesWithoutThem() {
+    let store = makeStore()
+    let legacy = Album(title: "Hovvdy", artist: "Hovvdy", spotifyURI: "spotify:album:1jEwzUBvIlVPeOfqR3Ghr0", artworkName: "hovvdy")
+    store.save(Library(entries: [
+        .init(album: legacy, origin: CGPoint(x: 100, y: 300)),
+        .init(album: a, origin: CGPoint(x: 700, y: 200)),
+    ]))
+    let controller = makeController(store: store)
+    #expect(controller.windows.map(\.album) == [a])
+    #expect(store.load() == Library(entries: [.init(album: a, origin: CGPoint(x: 700, y: 200))]))
+}
