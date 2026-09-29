@@ -144,11 +144,11 @@ private func scrambled(count: Int, seed: UInt64, size: CGFloat = 220) -> [Placem
     #expect(Set(origins.map(\.y)).count >= 8)
 }
 
-@Test func scrambleTurnsCoversALittle() {
+@Test func scrambleTurnsSomeCoversAndLeavesOthersStraight() {
     let rotations = (0..<50 as Range<UInt64>).flatMap { seed in scrambled(count: 10, seed: seed).map(\.rotation) }
     #expect(rotations.allSatisfy { abs($0) <= 15 })
     #expect(rotations.contains { $0 > 10 } && rotations.contains { $0 < -10 })
-    #expect(rotations.filter { $0 != 0 }.count > rotations.count * 9 / 10)
+    #expect(rotations.contains(0) && rotations.contains { $0 != 0 })
 }
 
 @Test func scrambleIsDifferentEachTime() {
@@ -159,11 +159,33 @@ private func scrambled(count: Int, seed: UInt64, size: CGFloat = 220) -> [Placem
     #expect(scrambled(count: 0, seed: 1).isEmpty)
 }
 
-@Test func randomRotationsStayWithinFifteenDegreesEitherWay() {
+private func manyRotations() -> [CGFloat] {
     var rng = SeededGenerator(seed: 9)
-    let rotations = (0..<1000).map { _ in Placement.randomRotation(using: &rng) }
+    return (0..<20_000).map { _ in Placement.randomRotation(using: &rng) }
+}
+
+@Test func randomRotationsStayWithinFifteenDegreesEitherWay() {
+    let rotations = manyRotations()
     #expect(rotations.allSatisfy { abs($0) <= 15 })
-    #expect(rotations.contains { $0 > 0 } && rotations.contains { $0 < 0 })
+    #expect(rotations.contains { $0 > 14 } && rotations.contains { $0 < -14 })
+}
+
+@Test func fortyPercentOfRandomRotationsAreStraight() {
+    let straight = Double(manyRotations().filter { $0 == 0 }.count) / 20_000
+    #expect(abs(straight - 0.4) < 0.02, "\(straight) of the covers were straight")
+}
+
+@Test func turnedCoversAreTurnedAtLeastAVisibleAmountAndBothWays() {
+    let turned = manyRotations().filter { $0 != 0 }
+    #expect(turned.allSatisfy { abs($0) >= 1 })
+    let clockwise = Double(turned.filter { $0 < 0 }.count) / Double(turned.count)
+    #expect(abs(clockwise - 0.5) < 0.03)
+}
+
+@Test func smallerTurnsAreLikelierThanLargerOnes() {
+    let sizes = manyRotations().map(abs).filter { $0 != 0 }
+    let bands = [1.0..<4, 4..<8, 8..<12, 12..<15.1].map { band in sizes.filter { band.contains(Double($0)) }.count }
+    #expect(bands[0] > bands[1] && bands[1] > bands[2] && bands[2] > bands[3], "\(bands)")
 }
 
 @Test func aTurnedCoverNeedsRoomAroundItsSquare() {

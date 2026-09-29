@@ -57,9 +57,17 @@ extension Placement {
     /// Covers turn by up to this many degrees either way when placed at random.
     public static let maxRotation: CGFloat = 15
 
-    /// A random turn, in tenths of a degree, up to `maxRotation` either way.
+    /// The chance that a cover placed at random stays straight.
+    public static let straightChance = 0.4
+
+    /// A random turn, in tenths of a degree. Most often none (`straightChance`); otherwise 1 to
+    /// `maxRotation` degrees either way, with small turns likelier than large ones.
     public static func randomRotation(using rng: inout some RandomNumberGenerator) -> CGFloat {
-        (CGFloat.random(in: -maxRotation...maxRotation, using: &rng) * 10).rounded() / 10
+        guard Double.random(in: 0..<1, using: &rng) >= straightChance else { return 0 }
+        let fraction = CGFloat.random(in: 0...1, using: &rng)
+        let degrees = 1 + (maxRotation - 1) * fraction * fraction
+        let turn = (degrees * 10).rounded() / 10
+        return Bool.random(using: &rng) ? turn : -turn
     }
 
     /// How far a `size` cover turned by `rotation` degrees reaches beyond its square on each side, in
