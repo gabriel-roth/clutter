@@ -7,9 +7,6 @@ public protocol SpotifyPlayer {
 
 /// Plays albums through the Spotify desktop app's AppleScript dictionary.
 public struct AppleScriptSpotifyPlayer: SpotifyPlayer {
-    /// Scripts run off the main thread so the covers stay responsive while Spotify launches.
-    private static let queue = DispatchQueue(label: "Clutter.AppleScriptSpotifyPlayer")
-
     public init() {}
 
     /// Spotify ignores `play track` while it is still starting up, so keep asking
@@ -27,10 +24,11 @@ public struct AppleScriptSpotifyPlayer: SpotifyPlayer {
         """
     }
 
+    /// Scripts run off the main thread so the covers stay responsive while Spotify launches.
     public func play(_ album: Album) {
         let source = Self.script(for: album)
         let title = album.title
-        Self.queue.async {
+        AppleScriptRunner.queue.async {
             var error: NSDictionary?
             NSAppleScript(source: source)?.executeAndReturnError(&error)
             if let error {
