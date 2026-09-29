@@ -21,12 +21,25 @@ import Testing
     #expect(store.load() == Library())
 }
 
-@Test func unreadableFileLoadsAsNil() throws {
+@Test func unreadableFileLoadsAsNilAndIsMovedAside() throws {
     let directory = temporaryDirectory()
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let file = directory.appending(path: "library.json")
     try Data("not json".utf8).write(to: file)
     #expect(LibraryStore(fileURL: file).load() == nil)
+    #expect(!FileManager.default.fileExists(atPath: file.path))
+    #expect(try Data(contentsOf: directory.appending(path: "library.json.unreadable")) == Data("not json".utf8))
+}
+
+@Test func unreadableFileReplacesAnEarlierUnreadableOne() throws {
+    let directory = temporaryDirectory()
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let file = directory.appending(path: "library.json")
+    let aside = directory.appending(path: "library.json.unreadable")
+    try Data("older".utf8).write(to: aside)
+    try Data("newer".utf8).write(to: file)
+    #expect(LibraryStore(fileURL: file).load() == nil)
+    #expect(try Data(contentsOf: aside) == Data("newer".utf8))
 }
 
 @Test func defaultDirectoryIsClutterInApplicationSupport() {
