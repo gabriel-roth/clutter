@@ -99,16 +99,59 @@ func failedFetchLeavesTheDesktopAlone(status: Int) async {
     #expect(harness.controller.windows.map(\.album.artworkName) == ["kept"])
 }
 
+/// Blocks waiters until opened. Ignores cancellation, so a cancelled waiter stays blocked too.
+private final class Gate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let resumeNow = lock.withLock {
+                if !isOpen { waiters.append(continuation) }
+                return isOpen
+            }
+            if resumeNow { continuation.resume() }
+        }
+    }
+
+    func open() {
+        let waiting = lock.withLock {
+            isOpen = true
+            defer { waiters = [] }
+            return waiters
+        }
+        waiting.forEach { $0.resume() }
+    }
+}
+
 @MainActor @Test func aNewRefreshCancelsTheOneRunning() async {
     let harness = Harness(replies: [
         (200, page([item("first", addedAt: "2026-09-01T00:00:00Z")])),
         (200, page([item("second", addedAt: "2026-09-01T00:00:00Z")])),
     ])
-    let sync = harness.sync()
+    // The first refresh stalls downloading its cover until the second has finished.
+    let firstDownloading = Gate(), releaseFirst = Gate()
+    let http = harness.http
+    let sync = LibrarySync(
+        library: SpotifyLibrary(accessToken: { "TOKEN" }, http: { try http.handle($0) }),
+        artwork: harness.artwork,
+        controller: harness.controller,
+        albumCount: { 10 },
+        download: { url in
+            if url.lastPathComponent == "first" {
+                firstDownloading.open()
+                await releaseFirst.wait()
+            }
+            return jpegData()
+        }
+    )
     let first = sync.refresh()
+    await firstDownloading.wait()
     let second = sync.refresh()
-    await first.value
     await second.value
+    releaseFirst.open()
+    await first.value
     #expect(first.isCancelled)
-    #expect(harness.controller.windows.count == 1)
+    #expect(harness.controller.windows.map(\.album.artworkName) == ["second"])
 }
