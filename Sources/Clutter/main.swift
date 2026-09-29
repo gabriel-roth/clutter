@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var aboutPanel: NSWindow?
     private var closeAboutOnCommandW: Any?
     private var sync: LibrarySync?
+    private var statusItem: NSStatusItem?
     private lazy var settings = SettingsWindowController(
         albumCount: AlbumCount.saved(in: .standard),
         showsInfoOnHover: HoverInfo.isEnabled(in: .standard),
@@ -50,6 +51,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         KeyboardShortcuts.onKeyUp(for: .addCurrentAlbum) { [weak self] in
             self?.addCurrentAlbum(nil)
         }
+    }
+
+    func installStatusItem(menu: NSMenu) {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.button?.image = NSImage(systemSymbolName: "square.stack", accessibilityDescription: "Clutter")
+        item.menu = menu
+        statusItem = item
     }
 
     @objc func showAbout(_ sender: Any?) {
@@ -187,5 +195,34 @@ viewMenuItem.submenu = viewMenu
 mainMenu.addItem(viewMenuItem)
 
 app.mainMenu = mainMenu
-app.setActivationPolicy(.regular)
+
+// Clutter lives in the menu bar, not the Dock. The same commands are in the status item's menu.
+let statusMenu = NSMenu()
+for (title, action, key) in [
+    ("Add Currently Playing Album", #selector(AppDelegate.addCurrentAlbum(_:)), ""),
+    ("Settings…", #selector(AppDelegate.showSettings(_:)), ","),
+] {
+    let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+    item.target = delegate
+    if action == #selector(AppDelegate.addCurrentAlbum(_:)) { item.setShortcut(for: .addCurrentAlbum) }
+    statusMenu.addItem(item)
+}
+let sizeMenu = NSMenu(title: "Cover Size")
+for size in CoverSize.allCases {
+    let item = NSMenuItem(title: size.title, action: #selector(AppDelegate.setCoverSize(_:)), keyEquivalent: "")
+    item.target = delegate
+    item.representedObject = size.rawValue
+    sizeMenu.addItem(item)
+}
+let sizeMenuItem = NSMenuItem(title: "Cover Size", action: nil, keyEquivalent: "")
+sizeMenuItem.submenu = sizeMenu
+statusMenu.addItem(sizeMenuItem)
+statusMenu.addItem(.separator())
+let statusAboutItem = NSMenuItem(title: "About Clutter", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
+statusAboutItem.target = delegate
+statusMenu.addItem(statusAboutItem)
+statusMenu.addItem(withTitle: "Quit Clutter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+delegate.installStatusItem(menu: statusMenu)
+
+app.setActivationPolicy(.accessory)
 app.run()
