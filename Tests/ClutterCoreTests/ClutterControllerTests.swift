@@ -12,13 +12,14 @@ private func makeStore() -> LibraryStore {
 private func makeController(
     store: LibraryStore,
     artwork: ArtworkStore = ArtworkStore(directory: temporaryDirectory()),
-    player: SpotifyPlayer = SpyPlayer()
+    player: SpotifyPlayer = SpyPlayer(),
+    coverSize: CoverSize = .medium
 ) -> ClutterController {
-    ClutterController(store: store, artwork: artwork, player: player, screens: [screen], rng: SeededGenerator(seed: 3))
+    ClutterController(store: store, artwork: artwork, player: player, screens: [screen], coverSize: coverSize, rng: SeededGenerator(seed: 3))
 }
 
-private func coverFrame(at origin: CGPoint) -> CGRect {
-    CGRect(origin: origin, size: CGSize(width: ClutterController.windowSize, height: ClutterController.windowSize))
+private func coverFrame(at origin: CGPoint, size: CoverSize = .medium) -> CGRect {
+    CGRect(origin: origin, size: CGSize(width: size.points, height: size.points))
 }
 
 private let custom = Album(title: "Custom", artist: "Someone", spotifyURI: "spotify:album:custom1", artworkName: "custom1")
@@ -126,4 +127,44 @@ private let custom = Album(title: "Custom", artist: "Someone", spotifyURI: "spot
     #expect(controller.closingWindows == [window])
     try? await Task.sleep(for: .milliseconds(50))
     #expect(controller.closingWindows.isEmpty)
+}
+
+@MainActor @Test func coversOpenAtTheChosenSize() {
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: custom, origin: CGPoint(x: 100, y: 300))]))
+    let controller = makeController(store: store, coverSize: .large)
+    #expect(controller.windows[0].frame == coverFrame(at: CGPoint(x: 100, y: 300), size: .large))
+}
+
+@MainActor @Test func firstLaunchKeepsLargeCoversOnScreen() {
+    let controller = makeController(store: makeStore(), coverSize: .large)
+    for window in controller.windows {
+        #expect(window.frame.size == CGSize(width: 300, height: 300))
+        #expect(screen.contains(window.frame), "\(window.frame) is off screen")
+    }
+}
+
+@MainActor @Test func changingTheSizeResizesCoversInPlaceFromTheTopLeft() {
+    let store = makeStore()
+    store.save(Library(entries: [
+        .init(album: custom, origin: CGPoint(x: 100, y: 300)),
+        .init(album: Album.starters[0], origin: CGPoint(x: 700, y: 200)),
+    ]))
+    let controller = makeController(store: store)
+    controller.setCoverSize(.small)
+    // Top-left corners stay put: y moves up by the 60-point difference in height.
+    #expect(controller.windows.map(\.frame) == [
+        coverFrame(at: CGPoint(x: 100, y: 360), size: .small),
+        coverFrame(at: CGPoint(x: 700, y: 260), size: .small),
+    ])
+    #expect(store.load()?.entries.map(\.origin) == [CGPoint(x: 100, y: 360), CGPoint(x: 700, y: 260)])
+    #expect(controller.coverSize == .small)
+}
+
+@MainActor @Test func coversAddedAfterAResizeUseTheNewSize() {
+    let controller = makeController(store: makeStore())
+    controller.setCoverSize(.large)
+    controller.add(custom)
+    #expect(controller.windows.last?.frame.size == CGSize(width: 300, height: 300))
+    #expect(screen.contains(controller.windows.last!.frame))
 }

@@ -4,9 +4,8 @@ import AppKit
 /// as covers are moved, closed, and added.
 @MainActor
 public final class ClutterController: NSObject, NSWindowDelegate {
-    public nonisolated static let windowSize: CGFloat = 220
-
     public private(set) var library: Library
+    public private(set) var coverSize: CoverSize
     public private(set) var windows: [AlbumWindow] = []
     /// Closed windows kept alive until the current event finishes: a cover is closed from its own
     /// close button's action, which must not find its window (and button) freed underneath it.
@@ -24,12 +23,14 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         artwork: ArtworkStore,
         player: SpotifyPlayer,
         screens: [CGRect],
+        coverSize: CoverSize = .medium,
         rng: any RandomNumberGenerator = SystemRandomNumberGenerator()
     ) {
         self.store = store
         self.artwork = artwork
         self.player = player
         self.screens = screens
+        self.coverSize = coverSize
         self.rng = rng
         self.library = Library()
         super.init()
@@ -42,7 +43,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
                 library.add(album, at: randomOrigin())
             }
         }
-        for entry in library.entries where !Placement.isVisible(Self.frame(at: entry.origin), on: screens) {
+        for entry in library.entries where !Placement.isVisible(frame(at: entry.origin), on: screens) {
             library.move(spotifyURI: entry.album.spotifyURI, to: randomOrigin())
             changed = true
         }
@@ -53,6 +54,18 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     public func showWindows() {
         windows.forEach { $0.orderFront(nil) }
+    }
+
+    /// Resizes every cover to `size`, keeping each one's top-left corner where it is.
+    public func setCoverSize(_ size: CoverSize) {
+        coverSize = size
+        for window in windows {
+            let topLeft = CGPoint(x: window.frame.minX, y: window.frame.maxY)
+            let origin = CGPoint(x: topLeft.x, y: topLeft.y - size.points)
+            window.setFrame(frame(at: origin), display: true)
+            library.move(spotifyURI: window.album.spotifyURI, to: origin)
+        }
+        store.save(library)
     }
 
     /// Shows a new cover for `album` at a random spot. If it's already shown, brings that cover
@@ -91,7 +104,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     private func makeWindow(for entry: Library.Entry) -> AlbumWindow {
         let album = entry.album
-        let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: Self.frame(at: entry.origin))
+        let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: frame(at: entry.origin))
         window.albumView.onDoubleClick = { [player] in player.play(album) }
         window.albumView.onClose = { [weak self] in self?.remove(album) }
         window.delegate = self
@@ -101,11 +114,11 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     private func randomOrigin() -> CGPoint {
         // Whole points, rounded down: AppKit snaps window frames to pixels, so a fractional origin
         // would be saved differently from where the window actually sits.
-        let origin = Placement.randomOrigin(size: Self.windowSize, in: screens[0], using: &rng)
+        let origin = Placement.randomOrigin(size: coverSize.points, in: screens[0], using: &rng)
         return CGPoint(x: origin.x.rounded(.down), y: origin.y.rounded(.down))
     }
 
-    private static func frame(at origin: CGPoint) -> CGRect {
-        CGRect(origin: origin, size: CGSize(width: windowSize, height: windowSize))
+    private func frame(at origin: CGPoint) -> CGRect {
+        CGRect(origin: origin, size: CGSize(width: coverSize.points, height: coverSize.points))
     }
 }
