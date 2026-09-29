@@ -146,8 +146,8 @@ private func scrambled(count: Int, seed: UInt64, size: CGFloat = 220) -> [Placem
 
 @Test func scrambleTurnsSomeCoversAndLeavesOthersStraight() {
     let rotations = (0..<50 as Range<UInt64>).flatMap { seed in scrambled(count: 10, seed: seed).map(\.rotation) }
-    #expect(rotations.allSatisfy { abs($0) <= 15 })
-    #expect(rotations.contains { $0 > 10 } && rotations.contains { $0 < -10 })
+    #expect(rotations.allSatisfy { abs($0) <= 10 })
+    #expect(rotations.contains { $0 > 8 } && rotations.contains { $0 < -8 })
     #expect(rotations.contains(0) && rotations.contains { $0 != 0 })
 }
 
@@ -164,10 +164,10 @@ private func manyRotations() -> [CGFloat] {
     return (0..<20_000).map { _ in Placement.randomRotation(using: &rng) }
 }
 
-@Test func randomRotationsStayWithinFifteenDegreesEitherWay() {
+@Test func randomRotationsStayWithinTenDegreesEitherWay() {
     let rotations = manyRotations()
-    #expect(rotations.allSatisfy { abs($0) <= 15 })
-    #expect(rotations.contains { $0 > 14 } && rotations.contains { $0 < -14 })
+    #expect(rotations.allSatisfy { abs($0) <= 10 })
+    #expect(rotations.contains { $0 > 9 } && rotations.contains { $0 < -9 })
 }
 
 @Test func fortyPercentOfRandomRotationsAreStraight() {
@@ -184,7 +184,7 @@ private func manyRotations() -> [CGFloat] {
 
 @Test func smallerTurnsAreLikelierThanLargerOnes() {
     let sizes = manyRotations().map(abs).filter { $0 != 0 }
-    let bands = [1.0..<4, 4..<8, 8..<12, 12..<15.1].map { band in sizes.filter { band.contains(Double($0)) }.count }
+    let bands = [1.0..<3.25, 3.25..<5.5, 5.5..<7.75, 7.75..<10.1].map { band in sizes.filter { band.contains(Double($0)) }.count }
     #expect(bands[0] > bands[1] && bands[1] > bands[2] && bands[2] > bands[3], "\(bands)")
 }
 

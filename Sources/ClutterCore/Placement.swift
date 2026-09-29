@@ -55,7 +55,7 @@ extension Placement {
     }
 
     /// Covers turn by up to this many degrees either way when placed at random.
-    public static let maxRotation: CGFloat = 15
+    public static let maxRotation: CGFloat = 10
 
     /// The chance that a cover placed at random stays straight.
     public static let straightChance = 0.4
