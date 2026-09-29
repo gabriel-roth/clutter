@@ -112,3 +112,41 @@ private func tidied(_ origins: [CGPoint], size: CGFloat = 220, on screens: [CGRe
 private func distinctCount(_ points: [CGPoint]) -> Int {
     Set(points.map { "\($0.x),\($0.y)" }).count
 }
+
+// MARK: Scramble
+
+private func scrambled(count: Int, seed: UInt64, size: CGFloat = 220) -> [CGPoint] {
+    var rng = SeededGenerator(seed: seed)
+    return Placement.scrambledOrigins(count: count, size: size, in: screen, using: &rng)
+}
+
+@Test func scrambleKeepsEveryCoverOnScreen() {
+    for seed in 0..<200 as Range<UInt64> {
+        for origin in scrambled(count: 10, seed: seed) {
+            let frame = CGRect(origin: origin, size: CGSize(width: 220, height: 220))
+            #expect(screen.contains(frame), "\(frame) is not inside \(screen)")
+        }
+    }
+}
+
+@Test func scrambleSpreadsCoversAcrossTheWholeScreen() {
+    for seed in 0..<100 as Range<UInt64> {
+        let origins = scrambled(count: 10, seed: seed)
+        #expect(origins.map(\.x).min()! < 400 && origins.map(\.x).max()! > 800)
+        #expect(origins.map(\.y).min()! < 300 && origins.map(\.y).max()! > 400)
+    }
+}
+
+@Test func scrambleDoesNotLineCoversUpInRowsOrColumns() {
+    let origins = scrambled(count: 10, seed: 5)
+    #expect(Set(origins.map(\.x)).count >= 8)
+    #expect(Set(origins.map(\.y)).count >= 8)
+}
+
+@Test func scrambleIsDifferentEachTime() {
+    #expect(scrambled(count: 10, seed: 1) != scrambled(count: 10, seed: 2))
+}
+
+@Test func scrambleOfNothingIsNothing() {
+    #expect(scrambled(count: 0, seed: 1).isEmpty)
+}

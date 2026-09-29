@@ -109,9 +109,9 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         place(origins)
     }
 
-    /// Moves every cover to a new random spot, leaving the stacking order alone.
+    /// Moves every cover to a new messy spot spread across the first screen, leaving the stacking order alone.
     public func scramble() {
-        place(windows.map { _ in randomOrigin() })
+        place(Placement.scrambledOrigins(count: windows.count, size: coverSize.points, in: screens[0], using: &rng))
     }
 
     /// Moves each cover to the matching origin, in stacking order, and saves the positions.
