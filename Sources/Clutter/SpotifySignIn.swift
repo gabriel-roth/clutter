@@ -13,17 +13,19 @@ final class SpotifySignIn: NSObject, ASWebAuthenticationPresentationContextProvi
         self.auth = auth
     }
 
-    func promptIfSignedOut() async {
-        guard await !auth.isSignedIn else { return }
+    /// Whether Clutter is signed in once this finishes.
+    func promptIfSignedOut() async -> Bool {
+        guard await !auth.isSignedIn else { return true }
         let alert = NSAlert()
         alert.messageText = "Connect Clutter to Spotify"
-        alert.informativeText = "Sign in so Clutter can see the albums in your Spotify library."
+        alert.informativeText = "Sign in so Clutter can show and save the albums in your Spotify library."
         alert.addButton(withTitle: "Sign In…")
         alert.addButton(withTitle: "Not Now")
         NSApp.activate()
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard alert.runModal() == .alertFirstButtonReturn else { return false }
         do {
             try await auth.signIn { url in try await self.authorize(url) }
+            return true
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             // The user closed the sign-in window.
         } catch {
@@ -33,6 +35,7 @@ final class SpotifySignIn: NSObject, ASWebAuthenticationPresentationContextProvi
             failure.informativeText = error.localizedDescription
             failure.runModal()
         }
+        return false
     }
 
     private func authorize(_ url: URL) async throws -> URL {

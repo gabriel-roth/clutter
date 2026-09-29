@@ -5,9 +5,15 @@ import KeyboardShortcuts
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let artwork = ArtworkStore(directory: LibraryStore.defaultDirectory.appending(path: "Artwork", directoryHint: .isDirectory))
+    private let auth = SpotifyAuth()
+    private lazy var spotifyLibrary = SpotifyLibrary(accessToken: { [auth] in try await auth.validAccessToken() })
+    private lazy var spotifySignIn = SpotifySignIn(auth: auth)
     private var controller: ClutterController?
-    private lazy var settings = SettingsWindowController(albumCount: AlbumCount.saved(in: .standard), onAlbumCountChange: { AlbumCount.save($0, in: .standard) })
-    private let spotifySignIn = SpotifySignIn(auth: SpotifyAuth())
+    private var sync: LibrarySync?
+    private lazy var settings = SettingsWindowController(albumCount: AlbumCount.saved(in: .standard)) { [weak self] count in
+        AlbumCount.save(count, in: .standard)
+        self?.sync?.refresh()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let screens = NSScreen.screens.map(\.visibleFrame)
@@ -20,7 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         )
         controller.showWindows()
         self.controller = controller
-        Task { await spotifySignIn.promptIfSignedOut() }
+        let sync = LibrarySync(library: spotifyLibrary, artwork: artwork, controller: controller, albumCount: { AlbumCount.saved(in: .standard) })
+        self.sync = sync
+        Task {
+            if await spotifySignIn.promptIfSignedOut() {
+                sync.refresh()
+            }
+        }
         KeyboardShortcuts.onKeyUp(for: .addCurrentAlbum) { [weak self] in
             self?.addCurrentAlbum(nil)
         }
@@ -44,9 +56,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
+    /// Saves the playing album to the Spotify library (re-saving it if it's already there, so it
+    /// becomes the most recent), then refreshes the desktop and brings its cover to the front.
     @objc func addCurrentAlbum(_ sender: Any?) {
-        // Replaced in the LibrarySync task.
-        NSSound.beep()
+        Task {
+            do {
+                let albumURI = try await CurrentAlbumFetcher.live.fetchAlbumURI()
+                try await spotifyLibrary.bumpToMostRecent(albumURI: albumURI)
+                await sync?.refresh().value
+                controller?.bringToFront(spotifyURI: albumURI)
+            } catch {
+                NSLog("Clutter: couldn't add the current album: %@", String(describing: error))
+                NSSound.beep()
+            }
+        }
     }
 }
 
