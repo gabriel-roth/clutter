@@ -274,3 +274,56 @@ private func mouseDown(at point: CGPoint, clickCount: Int = 1) -> NSEvent {
     }
     #expect(!view.removeButton.frame.intersects(view.cancelButton.frame))
 }
+
+@MainActor @Test func aTurnedCoverSitsCenteredInATransparentWindowJustBigEnoughForIt() {
+    let cover = CGRect(x: 100, y: 100, width: 220, height: 220)
+    let album = Album(title: "T", artist: "A", spotifyURI: "spotify:album:t", artworkName: "t")
+    let window = AlbumWindow(album: album, image: nil, frame: cover, rotation: 15)
+    #expect(!window.isOpaque && window.backgroundColor == .clear)
+    #expect(window.frame == cover.insetBy(dx: -25, dy: -25))
+    #expect(window.coverFrame == cover)
+    #expect(window.albumView.rotation == 15 && window.albumView.coverSide == 220)
+    window.setCover(frame: cover, rotation: 0)
+    #expect(window.frame == cover && window.coverFrame == cover)
+}
+
+@MainActor @Test func aTurnedCoverTakesClicksOnlyWhereTheCoverIs() {
+    let container = NSView(frame: CGRect(x: 0, y: 0, width: 270, height: 270))
+    let view = AlbumView(image: nil)
+    view.frame = container.bounds
+    view.coverSide = 220
+    view.rotation = 15
+    container.addSubview(view)
+    #expect(view.hitTest(CGPoint(x: 135, y: 135)) != nil)
+    #expect(view.hitTest(CGPoint(x: 1, y: 1)) == nil)
+    #expect(view.hitTest(CGPoint(x: 269, y: 269)) == nil)
+    view.rotation = 0
+    view.coverSide = nil
+    #expect(view.hitTest(CGPoint(x: 1, y: 1)) != nil)
+}
+
+@MainActor @Test func hoveringOnlyCountsOnTheTurnedCover() {
+    let view = AlbumView(image: nil, artist: "A", title: "T")
+    view.frame = CGRect(x: 0, y: 0, width: 270, height: 270)
+    view.coverSide = 220
+    view.rotation = 15
+    func moved(to point: CGPoint) -> NSEvent {
+        NSEvent.mouseEvent(with: .mouseMoved, location: point, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
+    }
+    view.mouseMoved(with: moved(to: CGPoint(x: 1, y: 1)))
+    #expect(!view.isShowingInfo)
+    view.mouseMoved(with: moved(to: CGPoint(x: 135, y: 135)))
+    #expect(view.isShowingInfo)
+    view.mouseExited(with: enterExit(.mouseExited))
+}
+
+@MainActor @Test func aTurnedCoverDrawsTransparentCornersAndAnOpaqueCenter() {
+    let view = AlbumView(image: nil)
+    view.frame = CGRect(x: 0, y: 0, width: 270, height: 270)
+    view.coverSide = 220
+    view.rotation = 15
+    let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+    view.cacheDisplay(in: view.bounds, to: rep)
+    #expect(rep.colorAt(x: 135, y: 135)?.alphaComponent == 1)
+    #expect(rep.colorAt(x: 1, y: 1)?.alphaComponent == 0)
+}

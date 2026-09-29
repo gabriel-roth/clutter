@@ -51,7 +51,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         var changed = current.count != library.entries.count
         library = Library(entries: current)
         for entry in library.entries where !Placement.isVisible(frame(at: entry.origin), on: screens) {
-            library.move(spotifyURI: entry.album.spotifyURI, to: randomOrigin())
+            let spot = randomSpot()
+            library.place(spotifyURI: entry.album.spotifyURI, at: spot.origin, rotation: spot.rotation)
             changed = true
         }
         self.library = library
@@ -95,30 +96,32 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public func setCoverSize(_ size: CoverSize) {
         coverSize = size
         for window in windows {
-            let topLeft = CGPoint(x: window.frame.minX, y: window.frame.maxY)
-            let origin = CGPoint(x: topLeft.x, y: topLeft.y - size.points)
-            window.setFrame(frame(at: origin), display: true)
+            let cover = window.coverFrame
+            let origin = CGPoint(x: cover.minX, y: cover.maxY - size.points)
+            window.setCover(frame: frame(at: origin), rotation: window.rotation)
             library.move(spotifyURI: window.album.spotifyURI, to: origin)
         }
         store.save(library)
     }
 
-    /// Lines every cover up in a grid, each as near as it can get to where it was.
+    /// Lines every cover up in an evenly spread grid, each as near as it can get to where it was, and
+    /// turns them all straight.
     public func tidy() {
-        let origins = Placement.tidyOrigins(of: windows.map(\.frame.origin), size: coverSize.points, on: screens)
-        place(origins)
+        let origins = Placement.tidyOrigins(of: windows.map(\.coverFrame.origin), size: coverSize.points, on: screens)
+        place(origins.map { Placement.Spot(origin: $0, rotation: 0) })
     }
 
-    /// Moves every cover to a new messy spot spread across the first screen, leaving the stacking order alone.
+    /// Moves every cover to a new messy spot spread across the first screen, turning each a little,
+    /// and leaves the stacking order alone.
     public func scramble() {
-        place(Placement.scrambledOrigins(count: windows.count, size: coverSize.points, in: screens[0], using: &rng))
+        place(Placement.scrambledSpots(count: windows.count, size: coverSize.points, in: screens[0], using: &rng))
     }
 
-    /// Moves each cover to the matching origin, in stacking order, and saves the positions.
-    private func place(_ origins: [CGPoint]) {
-        for (window, origin) in zip(windows, origins) {
-            window.setFrame(frame(at: origin), display: true)
-            library.move(spotifyURI: window.album.spotifyURI, to: origin)
+    /// Moves and turns each cover, in stacking order, to the matching spot, and saves them.
+    private func place(_ spots: [Placement.Spot]) {
+        for (window, spot) in zip(windows, spots) {
+            window.setCover(frame: frame(at: spot.origin), rotation: spot.rotation)
+            library.place(spotifyURI: window.album.spotifyURI, at: spot.origin, rotation: spot.rotation)
         }
         store.save(library)
     }
@@ -134,7 +137,13 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     /// A cover whose album details changed is rebuilt in place; a placeholder cover takes artwork cached since.
     /// Albums still being removed are left out.
     public func apply(_ albums: [Album]) {
-        library.reconcile(with: albums.filter { !removing.contains($0.spotifyURI) }, newOrigin: randomOrigin)
+        // A new cover's turn is chosen before its origin, which must leave room for the turn.
+        var pending: Placement.Spot?
+        library.reconcile(
+            with: albums.filter { !removing.contains($0.spotifyURI) },
+            newOrigin: { let spot = randomSpot(); pending = spot; return spot.origin },
+            newRotation: { pending?.rotation ?? 0 }
+        )
         store.save(library)
         let old = windows
         var candidates = Dictionary(old.map { ($0.album.spotifyURI, $0) }, uniquingKeysWith: { first, _ in first })
@@ -182,7 +191,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     public func windowDidMove(_ notification: Notification) {
         guard let window = notification.object as? AlbumWindow else { return }
-        library.move(spotifyURI: window.album.spotifyURI, to: window.frame.origin)
+        library.move(spotifyURI: window.album.spotifyURI, to: window.coverFrame.origin)
         store.save(library)
     }
 
@@ -200,7 +209,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     private func makeWindow(for entry: Library.Entry) -> AlbumWindow {
         let album = entry.album
-        let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: frame(at: entry.origin))
+        let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: frame(at: entry.origin), rotation: entry.rotation)
         window.albumView.showsInfoOnHover = showsInfoOnHover
         window.albumView.onDoubleClick = { [player] in player.play(album) }
         window.albumView.onMouseDown = { [weak self, weak window] in
@@ -215,13 +224,17 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         return window
     }
 
-    private func randomOrigin() -> CGPoint {
+    /// A random turn and, on the first screen, an origin that leaves the whole turned cover on screen.
+    private func randomSpot() -> Placement.Spot {
+        let rotation = Placement.randomRotation(using: &rng)
+        let margin = Placement.rotationMargin(size: coverSize.points, rotation: rotation)
         // Whole points, rounded down: AppKit snaps window frames to pixels, so a fractional origin
         // would be saved differently from where the window actually sits.
-        let origin = Placement.randomOrigin(size: coverSize.points, in: screens[0], using: &rng)
-        return CGPoint(x: origin.x.rounded(.down), y: origin.y.rounded(.down))
+        let origin = Placement.randomOrigin(size: coverSize.points, in: screens[0].insetBy(dx: margin, dy: margin), using: &rng)
+        return Placement.Spot(origin: CGPoint(x: origin.x.rounded(.down), y: origin.y.rounded(.down)), rotation: rotation)
     }
 
+    /// The cover's square at `origin`.
     private func frame(at origin: CGPoint) -> CGRect {
         CGRect(origin: origin, size: CGSize(width: coverSize.points, height: coverSize.points))
     }

@@ -55,7 +55,7 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 5000, y: 5000))]))
     let controller = makeController(store: store)
     #expect(screen.contains(controller.windows[0].frame))
-    #expect(store.load()?.entries[0].origin == controller.windows[0].frame.origin)
+    #expect(store.load()?.entries[0].origin == controller.windows[0].coverFrame.origin)
 }
 
 @MainActor @Test func movingAWindowSavesItsPosition() {
@@ -203,7 +203,7 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     controller.setCoverSize(.large)
     controller.apply([a, b, c])
     for window in controller.windows {
-        #expect(window.frame.size == CGSize(width: 300, height: 300))
+        #expect(window.coverFrame.size == CGSize(width: 300, height: 300))
         #expect(screen.contains(window.frame), "\(window.frame) is off screen")
     }
 }
@@ -342,16 +342,68 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     #expect(controller.windows.map(\.album) == [a, b, c, d])
 }
 
-@MainActor @Test func scrambleMovesCoversToNewSpotsOnScreenAndKeepsTheOrder() {
+@MainActor @Test func scrambleMovesCoversToNewSpotsTurnsThemAndKeepsTheOrder() {
     let store = makeStore()
     let start = [CGPoint(x: 100, y: 100), CGPoint(x: 400, y: 300), CGPoint(x: 700, y: 500)]
     store.save(Library(entries: zip([a, b, c], start).map { .init(album: $0, origin: $1) }))
     let controller = makeController(store: store)
     controller.scramble()
-    let origins = controller.windows.map(\.frame.origin)
+    let origins = controller.windows.map(\.coverFrame.origin)
     #expect(origins != start)
     #expect(Set(origins.map { "\($0.x),\($0.y)" }).count == 3)
     #expect(controller.windows.allSatisfy { screen.contains($0.frame) })
+    #expect(controller.windows.contains { $0.rotation != 0 })
+    #expect(controller.windows.allSatisfy { abs($0.rotation) <= 15 && $0.albumView.rotation == $0.rotation })
     #expect(store.load()?.entries.map(\.origin) == origins)
+    #expect(store.load()?.entries.map(\.rotation) == controller.windows.map(\.rotation))
     #expect(controller.windows.map(\.album) == [a, b, c])
+}
+
+@MainActor @Test func tidyTurnsEveryCoverStraight() {
+    let store = makeStore()
+    store.save(Library(entries: [a, b, c].map { .init(album: $0, origin: CGPoint(x: 100, y: 300), rotation: 11) }))
+    let controller = makeController(store: store)
+    controller.tidy()
+    #expect(controller.windows.allSatisfy { $0.rotation == 0 && $0.albumView.rotation == 0 })
+    #expect(controller.windows.allSatisfy { $0.frame == $0.coverFrame })
+    #expect(store.load()?.entries.map(\.rotation) == [0, 0, 0])
+}
+
+@MainActor @Test func tidyingATurnedCoverUsesItsSquareNotItsWindow() {
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 610, y: 352), rotation: 15)]))
+    let controller = makeController(store: store)
+    controller.tidy()
+    #expect(controller.windows[0].frame == coverFrame(at: CGPoint(x: 610, y: 352)))
+}
+
+@MainActor @Test func aTurnedCoversWindowSurroundsItsSquareAndDraggingSavesTheSquare() {
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 300, y: 300), rotation: 15)]))
+    let controller = makeController(store: store)
+    let window = controller.windows[0]
+    #expect(window.coverFrame == coverFrame(at: CGPoint(x: 300, y: 300)))
+    #expect(window.frame.contains(window.coverFrame) && window.frame.width > 220)
+    window.setFrameOrigin(CGPoint(x: window.frame.minX + 50, y: window.frame.minY + 20))
+    #expect(store.load()?.entries[0].origin == CGPoint(x: 350, y: 320))
+    #expect(store.load()?.entries[0].rotation == 15)
+}
+
+@MainActor @Test func resizingKeepsTurnedCoversTurnedAndAtTheirTopLeft() {
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 100, y: 300), rotation: -8)]))
+    let controller = makeController(store: store)
+    controller.setCoverSize(.small)
+    #expect(controller.windows[0].coverFrame == coverFrame(at: CGPoint(x: 100, y: 360), size: .small))
+    #expect(controller.windows[0].rotation == -8)
+}
+
+@MainActor @Test func newCoversStartWithASmallRandomTurnAndStayFullyOnScreen() {
+    let store = makeStore()
+    let controller = makeController(store: store)
+    controller.apply((0..<30).map { album("n\($0)") })
+    let rotations = controller.windows.map(\.rotation)
+    #expect(rotations.allSatisfy { abs($0) <= 15 } && rotations.contains { $0 != 0 })
+    #expect(controller.windows.allSatisfy { screen.contains($0.frame) })
+    #expect(store.load()?.entries.map(\.rotation) == rotations)
 }

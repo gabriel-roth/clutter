@@ -13,6 +13,15 @@ public final class AlbumView: NSView {
     public var showsInfoOnHover = true {
         didSet { needsDisplay = true }
     }
+    /// Degrees counterclockwise the cover is turned about its center. The view is then bigger than
+    /// the cover, which is drawn in the middle of it, and only the cover takes clicks.
+    public var rotation: CGFloat = 0 {
+        didSet { needsDisplay = true; needsLayout = true }
+    }
+    /// The cover's side; nil means the cover fills the view.
+    public var coverSide: CGFloat? {
+        didSet { needsDisplay = true; needsLayout = true }
+    }
     public var onDoubleClick: (() -> Void)?
     /// Called on every click, before dragging or playing.
     public var onMouseDown: (() -> Void)?
@@ -66,7 +75,45 @@ public final class AlbumView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    /// The cover in its own coordinates, before it's turned and centered in the view.
+    private var coverBounds: NSRect {
+        coverSide.map { NSRect(x: 0, y: 0, width: $0, height: $0) } ?? bounds
+    }
+
+    private var rotationRadians: CGFloat { rotation * .pi / 180 }
+
+    /// Where a point in the view falls on the cover.
+    private func coverPoint(fromViewPoint point: NSPoint) -> NSPoint {
+        let (dx, dy) = (point.x - bounds.midX, point.y - bounds.midY)
+        let (cosine, sine) = (cos(-rotationRadians), sin(-rotationRadians))
+        return NSPoint(x: dx * cosine - dy * sine + coverBounds.midX, y: dx * sine + dy * cosine + coverBounds.midY)
+    }
+
+    /// Where a point on the cover falls in the view.
+    private func viewPoint(fromCoverPoint point: NSPoint) -> NSPoint {
+        let (dx, dy) = (point.x - coverBounds.midX, point.y - coverBounds.midY)
+        let (cosine, sine) = (cos(rotationRadians), sin(rotationRadians))
+        return NSPoint(x: dx * cosine - dy * sine + bounds.midX, y: dx * sine + dy * cosine + bounds.midY)
+    }
+
+    private func coverContains(viewPoint point: NSPoint) -> Bool {
+        coverBounds.contains(coverPoint(fromViewPoint: point))
+    }
+
+    public override func hitTest(_ point: NSPoint) -> NSView? {
+        guard rotation != 0, let superview else { return super.hitTest(point) }
+        return coverContains(viewPoint: convert(point, from: superview)) ? super.hitTest(point) : nil
+    }
+
     public override func draw(_ dirtyRect: NSRect) {
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        let turn = NSAffineTransform()
+        turn.translateX(by: bounds.midX, yBy: bounds.midY)
+        turn.rotate(byRadians: rotationRadians)
+        turn.translateX(by: -coverBounds.midX, yBy: -coverBounds.midY)
+        turn.concat()
+        coverBounds.clip()
         drawCover()
         if isShowingInfo { drawInfo() }
         if isShowingCloseButton { drawCloseButton() }
@@ -76,14 +123,14 @@ public final class AlbumView: NSView {
     private func drawCover() {
         guard let image, image.size.width > 0, image.size.height > 0 else {
             NSColor.darkGray.setFill()
-            bounds.fill()
+            coverBounds.fill()
             return
         }
         // Aspect-fill: scale to cover the view, centered.
-        let scale = max(bounds.width / image.size.width, bounds.height / image.size.height)
+        let scale = max(coverBounds.width / image.size.width, coverBounds.height / image.size.height)
         let width = image.size.width * scale
         let height = image.size.height * scale
-        image.draw(in: NSRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2, width: width, height: height))
+        image.draw(in: NSRect(x: coverBounds.midX - width / 2, y: coverBounds.midY - height / 2, width: width, height: height))
     }
 
     static let artistFont = NSFont.systemFont(ofSize: 15, weight: .semibold)
@@ -110,19 +157,19 @@ public final class AlbumView: NSView {
         ]))
 
         let padding: CGFloat = 10
-        let available = bounds.insetBy(dx: padding + 4, dy: padding)
+        let available = coverBounds.insetBy(dx: padding + 4, dy: padding)
         let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .truncatesLastVisibleLine]
         let height = min(ceil(text.boundingRect(with: available.size, options: options).height), available.height)
 
         NSColor.black.withAlphaComponent(0.65).setFill()
-        NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: height + padding * 2).fill(using: .sourceOver)
-        text.draw(with: NSRect(x: available.minX, y: bounds.minY + padding, width: available.width, height: height), options: options)
+        NSRect(x: coverBounds.minX, y: coverBounds.minY, width: coverBounds.width, height: height + padding * 2).fill(using: .sourceOver)
+        text.draw(with: NSRect(x: available.minX, y: coverBounds.minY + padding, width: available.width, height: height), options: options)
     }
 
-    /// In view coordinates, which start at the bottom left.
+    /// In cover coordinates, which start at the bottom left.
     var closeButtonRect: NSRect {
         let size: CGFloat = 20
-        return NSRect(x: bounds.minX + 8, y: bounds.maxY - 8 - size, width: size, height: size)
+        return NSRect(x: coverBounds.minX + 8, y: coverBounds.maxY - 8 - size, width: size, height: size)
     }
 
     private func drawCloseButton() {
@@ -154,7 +201,7 @@ public final class AlbumView: NSView {
     }()
     private static let confirmationSpacing: CGFloat = 10
 
-    private var confirmationTextWidth: CGFloat { bounds.width - 20 }
+    private var confirmationTextWidth: CGFloat { coverBounds.width - 20 }
 
     private var confirmationTextHeight: CGFloat {
         let size = NSSize(width: confirmationTextWidth, height: .greatestFiniteMagnitude)
@@ -164,27 +211,47 @@ public final class AlbumView: NSView {
     /// Dims the whole cover behind the question; the buttons are subviews, placed by `layout`.
     private func drawConfirmation() {
         NSColor.black.withAlphaComponent(0.75).setFill()
-        bounds.fill(using: .sourceOver)
+        coverBounds.fill(using: .sourceOver)
         let textRect = NSRect(
-            x: bounds.midX - confirmationTextWidth / 2, y: removeButton.frame.maxY + Self.confirmationSpacing,
+            x: coverBounds.midX - confirmationTextWidth / 2, y: confirmationRowOrigin.y + confirmationRowHeight + Self.confirmationSpacing,
             width: confirmationTextWidth, height: confirmationTextHeight
         )
         Self.confirmationText.draw(with: textRect, options: .usesLineFragmentOrigin)
     }
 
-    /// Centers the question above Cancel and Remove, side by side.
+    private var confirmationRowHeight: CGFloat {
+        max(cancelButton.frame.height, removeButton.frame.height)
+    }
+
+    /// Where the row of Cancel and Remove starts on the cover, centered with the question above it.
+    private var confirmationRowOrigin: NSPoint {
+        let blockHeight = confirmationTextHeight + Self.confirmationSpacing + confirmationRowHeight
+        return NSPoint(x: (coverBounds.midX - confirmationRowWidth / 2).rounded(), y: (coverBounds.midY - blockHeight / 2).rounded())
+    }
+
+    private static let buttonGap: CGFloat = 8
+
+    private var confirmationRowWidth: CGFloat {
+        cancelButton.frame.width + Self.buttonGap + removeButton.frame.width
+    }
+
+    /// Centers the question above Cancel and Remove, side by side. The buttons stay upright, placed
+    /// where they'd fall on the turned cover.
     public override func layout() {
         super.layout()
         removeButton.sizeToFit()
         cancelButton.sizeToFit()
-        let gap: CGFloat = 8
-        let rowWidth = cancelButton.frame.width + gap + removeButton.frame.width
-        let rowHeight = max(cancelButton.frame.height, removeButton.frame.height)
-        let blockHeight = confirmationTextHeight + Self.confirmationSpacing + rowHeight
-        let y = (bounds.midY - blockHeight / 2).rounded()
-        let x = (bounds.midX - rowWidth / 2).rounded()
-        cancelButton.setFrameOrigin(NSPoint(x: x, y: y))
-        removeButton.setFrameOrigin(NSPoint(x: cancelButton.frame.maxX + gap, y: y))
+        let origin = confirmationRowOrigin
+        let cancelSpot = NSPoint(x: origin.x, y: origin.y)
+        let removeSpot = NSPoint(x: origin.x + cancelButton.frame.width + Self.buttonGap, y: origin.y)
+        for (button, spot) in [(cancelButton, cancelSpot), (removeButton, removeSpot)] {
+            if rotation == 0 {
+                button.setFrameOrigin(spot)
+            } else {
+                let center = viewPoint(fromCoverPoint: NSPoint(x: spot.x + button.frame.width / 2, y: spot.y + button.frame.height / 2))
+                button.setFrameOrigin(NSPoint(x: (center.x - button.frame.width / 2).rounded(), y: (center.y - button.frame.height / 2).rounded()))
+            }
+        }
     }
 
     public override func setFrameSize(_ newSize: NSSize) {
@@ -235,12 +302,21 @@ public final class AlbumView: NSView {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)
         // Always active, since covers sit on the desktop while other apps are in front.
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect], owner: self))
     }
 
     public override func mouseEntered(with event: NSEvent) {
-        isHovering = true
+        isHovering = pointerIsOnCover(event)
         startWatchingModifierKeys()
+    }
+
+    /// The tracking area is the whole window, corners included, so a turned cover checks the pointer itself.
+    public override func mouseMoved(with event: NSEvent) {
+        isHovering = pointerIsOnCover(event)
+    }
+
+    private func pointerIsOnCover(_ event: NSEvent) -> Bool {
+        rotation == 0 || coverContains(viewPoint: convert(event.locationInWindow, from: nil))
     }
 
     public override func mouseExited(with event: NSEvent) {
@@ -251,7 +327,7 @@ public final class AlbumView: NSView {
     public override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     public override func mouseDown(with event: NSEvent) {
-        if isShowingCloseButton, closeButtonRect.contains(convert(event.locationInWindow, from: nil)) {
+        if isShowingCloseButton, closeButtonRect.contains(coverPoint(fromViewPoint: convert(event.locationInWindow, from: nil))) {
             isConfirmingRemoval = true
             return
         }

@@ -100,3 +100,30 @@ private func counter() -> () -> CGPoint {
     library.remove(spotifyURI: b.spotifyURI)
     #expect(library.entries.map(\.album) == [a, c])
 }
+
+@Test func rotationRoundTripsThroughJSON() throws {
+    let library = Library(entries: [.init(album: lorelei, origin: CGPoint(x: 1, y: 2), rotation: -7.5)])
+    let decoded = try JSONDecoder().decode(Library.self, from: JSONEncoder().encode(library))
+    #expect(decoded.entries[0].rotation == -7.5)
+}
+
+@Test func librariesSavedBeforeRotationLoadStraight() throws {
+    let json = """
+    {"entries":[{"album":{"title":"T","artist":"A","spotifyURI":"spotify:album:t","artworkName":"t"},"origin":[3,4]}]}
+    """
+    let library = try JSONDecoder().decode(Library.self, from: Data(json.utf8))
+    #expect(library.entries[0].rotation == 0)
+    #expect(library.entries[0].origin == CGPoint(x: 3, y: 4))
+}
+
+@Test func placeSetsOriginAndRotation() {
+    var library = Library(entries: [.init(album: lorelei, origin: .zero)])
+    library.place(spotifyURI: lorelei.spotifyURI, at: CGPoint(x: 5, y: 6), rotation: 12)
+    #expect(library.entries[0].origin == CGPoint(x: 5, y: 6) && library.entries[0].rotation == 12)
+}
+
+@Test func reconcileKeepsRotationsAndTurnsNewCovers() {
+    var library = Library(entries: [.init(album: a, origin: .zero, rotation: 9)])
+    library.reconcile(with: [b, a], newOrigin: counter(), newRotation: { 4 })
+    #expect(library.entries.map(\.rotation) == [9, 4])
+}

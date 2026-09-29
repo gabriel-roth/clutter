@@ -47,22 +47,48 @@ extension Placement {
         return result
     }
 
-    /// Origins for `count` covers that are scattered across `visible` but not evenly: the covers are dealt
+    /// A cover's place on the desktop: the origin of its square and how far it's turned.
+    public struct Spot: Equatable, Sendable {
+        public var origin: CGPoint
+        /// Degrees counterclockwise about the cover's center.
+        public var rotation: CGFloat
+    }
+
+    /// Covers turn by up to this many degrees either way when placed at random.
+    public static let maxRotation: CGFloat = 15
+
+    /// A random turn, in tenths of a degree, up to `maxRotation` either way.
+    public static func randomRotation(using rng: inout some RandomNumberGenerator) -> CGFloat {
+        (CGFloat.random(in: -maxRotation...maxRotation, using: &rng) * 10).rounded() / 10
+    }
+
+    /// How far a `size` cover turned by `rotation` degrees reaches beyond its square on each side, in
+    /// whole points: the room the cover's window needs around the square.
+    public static func rotationMargin(size: CGFloat, rotation: CGFloat) -> CGFloat {
+        let radians = Double(rotation) * .pi / 180
+        let reach = Double(size) * (abs(cos(radians)) + abs(sin(radians)) - 1) / 2
+        return CGFloat(max(0, reach - 1e-9).rounded(.up))
+    }
+
+    /// Places for `count` covers that are scattered across `visible` but not evenly: the covers are dealt
     /// at random into the cells of the same grid Tidy uses, then each is knocked off its cell by up to
-    /// most of its size, so they crowd and overlap in places while still covering the whole screen.
-    /// Every cover stays entirely on screen.
-    public static func scrambledOrigins(count: Int, size: CGFloat, in visible: CGRect, using rng: inout some RandomNumberGenerator) -> [CGPoint] {
+    /// most of its size and turned a little, so they crowd and overlap in places while still covering
+    /// the whole screen. Every cover, turned, stays entirely on screen.
+    public static func scrambledSpots(count: Int, size: CGFloat, in visible: CGRect, using rng: inout some RandomNumberGenerator) -> [Spot] {
         guard count > 0 else { return [] }
         let reach = size * 0.75
-        let maxX = max(visible.minX, visible.maxX - size)
-        let maxY = visible.maxY - size
-        let minY = min(maxY, visible.minY)
         return gridCells(count: count, size: size, in: visible).shuffled(using: &rng).prefix(count).map { cell in
+            let rotation = randomRotation(using: &rng)
+            let margin = rotationMargin(size: size, rotation: rotation)
             // A different reach for each cover, so some sit nearly in place and others wander far.
             let wander = reach * CGFloat.random(in: 0.3...1, using: &rng)
             let x = cell.x + CGFloat.random(in: -wander...wander, using: &rng)
             let y = cell.y + CGFloat.random(in: -wander...wander, using: &rng)
-            return CGPoint(x: min(max(x, visible.minX), maxX).rounded(.down), y: min(max(y, minY), maxY).rounded(.down))
+            let minX = visible.minX + margin
+            let maxX = max(minX, visible.maxX - size - margin)
+            let maxY = visible.maxY - size - margin
+            let minY = min(maxY, visible.minY + margin)
+            return Spot(origin: CGPoint(x: min(max(x, minX), maxX).rounded(.down), y: min(max(y, minY), maxY).rounded(.down)), rotation: rotation)
         }
     }
 

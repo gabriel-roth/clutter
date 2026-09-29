@@ -115,32 +115,40 @@ private func distinctCount(_ points: [CGPoint]) -> Int {
 
 // MARK: Scramble
 
-private func scrambled(count: Int, seed: UInt64, size: CGFloat = 220) -> [CGPoint] {
+private func scrambled(count: Int, seed: UInt64, size: CGFloat = 220) -> [Placement.Spot] {
     var rng = SeededGenerator(seed: seed)
-    return Placement.scrambledOrigins(count: count, size: size, in: screen, using: &rng)
+    return Placement.scrambledSpots(count: count, size: size, in: screen, using: &rng)
 }
 
-@Test func scrambleKeepsEveryCoverOnScreen() {
+@Test func scrambleKeepsEveryTurnedCoverOnScreen() {
     for seed in 0..<200 as Range<UInt64> {
-        for origin in scrambled(count: 10, seed: seed) {
-            let frame = CGRect(origin: origin, size: CGSize(width: 220, height: 220))
-            #expect(screen.contains(frame), "\(frame) is not inside \(screen)")
+        for spot in scrambled(count: 10, seed: seed) {
+            let margin = Placement.rotationMargin(size: 220, rotation: spot.rotation)
+            let box = CGRect(origin: spot.origin, size: CGSize(width: 220, height: 220)).insetBy(dx: -margin, dy: -margin)
+            #expect(screen.contains(box), "\(box) is not inside \(screen)")
         }
     }
 }
 
 @Test func scrambleSpreadsCoversAcrossTheWholeScreen() {
     for seed in 0..<100 as Range<UInt64> {
-        let origins = scrambled(count: 10, seed: seed)
+        let origins = scrambled(count: 10, seed: seed).map(\.origin)
         #expect(origins.map(\.x).min()! < 400 && origins.map(\.x).max()! > 800)
         #expect(origins.map(\.y).min()! < 300 && origins.map(\.y).max()! > 400)
     }
 }
 
 @Test func scrambleDoesNotLineCoversUpInRowsOrColumns() {
-    let origins = scrambled(count: 10, seed: 5)
+    let origins = scrambled(count: 10, seed: 5).map(\.origin)
     #expect(Set(origins.map(\.x)).count >= 8)
     #expect(Set(origins.map(\.y)).count >= 8)
+}
+
+@Test func scrambleTurnsCoversALittle() {
+    let rotations = (0..<50 as Range<UInt64>).flatMap { seed in scrambled(count: 10, seed: seed).map(\.rotation) }
+    #expect(rotations.allSatisfy { abs($0) <= 15 })
+    #expect(rotations.contains { $0 > 10 } && rotations.contains { $0 < -10 })
+    #expect(rotations.filter { $0 != 0 }.count > rotations.count * 9 / 10)
 }
 
 @Test func scrambleIsDifferentEachTime() {
@@ -149,4 +157,18 @@ private func scrambled(count: Int, seed: UInt64, size: CGFloat = 220) -> [CGPoin
 
 @Test func scrambleOfNothingIsNothing() {
     #expect(scrambled(count: 0, seed: 1).isEmpty)
+}
+
+@Test func randomRotationsStayWithinFifteenDegreesEitherWay() {
+    var rng = SeededGenerator(seed: 9)
+    let rotations = (0..<1000).map { _ in Placement.randomRotation(using: &rng) }
+    #expect(rotations.allSatisfy { abs($0) <= 15 })
+    #expect(rotations.contains { $0 > 0 } && rotations.contains { $0 < 0 })
+}
+
+@Test func aTurnedCoverNeedsRoomAroundItsSquare() {
+    #expect(Placement.rotationMargin(size: 220, rotation: 0) == 0)
+    #expect(Placement.rotationMargin(size: 220, rotation: 15) == 25)
+    #expect(Placement.rotationMargin(size: 220, rotation: -15) == 25)
+    #expect(Placement.rotationMargin(size: 220, rotation: 0.1) >= 1)
 }
