@@ -154,3 +154,27 @@ private func page(_ items: [String], next: String? = nil) -> String {
     }
     #expect(http.recorded.map(\.httpMethod) == ["GET", "PUT"])
 }
+
+@Test func anUnreadableItemIsSkipped() async throws {
+    let http = FakeHTTP([(200, page([#"{"added_at":"2026-09-02T00:00:00Z","album":null}"#, item("good", addedAt: "2026-09-01T00:00:00Z")]))])
+    let albums = try await makeLibrary(http).recentAlbums(count: 10)
+    #expect(albums.map(\.album.artworkName) == ["good"])
+}
+
+@Test func aSkippedItemStillCountsTowardPaging() async throws {
+    // 49 good items and one bad one fill the first page, so the next request starts at 50.
+    let first = [#"{"album":null}"#] + (0..<49).map { item("p\($0)", addedAt: "2026-09-01T00:00:00Z") }
+    let second = (0..<50).map { item("q\($0)", addedAt: "2026-08-01T00:00:00Z") }
+    let http = FakeHTTP([(200, page(first, next: "more")), (200, page(second, next: "more"))])
+    let albums = try await makeLibrary(http).recentAlbums(count: 100)
+    #expect(albums.count == 99)
+    #expect(http.recorded.map(\.url?.absoluteString) == [
+        "https://api.spotify.com/v1/me/albums?limit=50&offset=0",
+        "https://api.spotify.com/v1/me/albums?limit=50&offset=50",
+    ])
+}
+
+@Test func aPageWithoutItemsIsMalformed() async {
+    let http = FakeHTTP([(200, #"{"next":null}"#)])
+    await #expect(throws: SpotifyLibraryError.malformedResponse) { try await makeLibrary(http).recentAlbums(count: 10) }
+}

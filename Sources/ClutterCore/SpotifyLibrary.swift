@@ -43,16 +43,24 @@ public struct SpotifyLibrary: Sendable {
         self.sleep = sleep
     }
 
-    /// Up to `count` of the most recently saved albums, newest first.
+    /// Up to `count` of the most recently saved albums, newest first. Items that can't be read
+    /// are logged and skipped, so fewer than `count` may come back.
     public func recentAlbums(count: Int) async throws -> [SavedAlbum] {
         var albums: [SavedAlbum] = []
-        while albums.count < count {
-            let limit = min(Self.pageSize, count - albums.count)
-            let data = try await send("GET", "me/albums", query: [("limit", "\(limit)"), ("offset", "\(albums.count)")])
+        var fetched = 0
+        while fetched < count {
+            let limit = min(Self.pageSize, count - fetched)
+            let data = try await send("GET", "me/albums", query: [("limit", "\(limit)"), ("offset", "\(fetched)")])
             guard let page = try? Self.makeDecoder().decode(SavedAlbumsPage.self, from: data) else {
                 throw SpotifyLibraryError.malformedResponse
             }
-            albums += page.items.map(\.savedAlbum)
+            fetched += page.items.count
+            for item in page.items {
+                switch item.result {
+                case .success(let item): albums.append(item.savedAlbum)
+                case .failure(let error): NSLog("Clutter: skipped an unreadable saved album: %@", String(describing: error))
+                }
+            }
             if page.next == nil || page.items.count < limit { break }
         }
         // Spotify doesn't document the order, so don't rely on it.
@@ -142,10 +150,19 @@ public struct SpotifyLibrary: Sendable {
     }
 }
 
-/// One page of GET /me/albums.
+/// One page of GET /me/albums. Each item decodes on its own, so one bad item doesn't spoil the page.
 private struct SavedAlbumsPage: Decodable {
-    let items: [Item]
+    let items: [Lenient]
     let next: String?
+
+    /// Never fails to decode, so a bad item is kept as its error and the array still advances past it.
+    struct Lenient: Decodable {
+        let result: Result<Item, any Error>
+
+        init(from decoder: any Decoder) {
+            result = Result { try Item(from: decoder) }
+        }
+    }
 
     struct Item: Decodable {
         let addedAt: Date
