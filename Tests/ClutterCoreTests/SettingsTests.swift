@@ -11,7 +11,7 @@ private func allSubviews(of view: NSView?) -> [NSView] {
 
 @MainActor @Test func settingsWindowHasAShortcutRecorder() {
     let settings = SettingsWindowController(albumCount: 10, onAlbumCountChange: { _ in })
-    #expect(settings.window.title == "Settings")
+    #expect(settings.window.title == "Clutter settings")
     #expect(settings.window.styleMask.contains(.closable))
     #expect(allSubviews(of: settings.window.contentView).compactMap { $0 as? KeyboardShortcuts.RecorderCocoa }.count == 1)
 }

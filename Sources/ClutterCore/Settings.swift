@@ -67,7 +67,7 @@ public final class SettingsWindowController: NSObject {
         showsInfoOnHoverCheckbox.action = #selector(showsInfoOnHoverChanged(_:))
 
         let shortcutRow = NSStackView(views: [
-            NSTextField(labelWithString: "Add currently playing album:"),
+            NSTextField(labelWithString: "Add currently playing album"),
             KeyboardShortcuts.RecorderCocoa(for: .addCurrentAlbum),
         ])
         shortcutRow.orientation = .horizontal
@@ -84,7 +84,7 @@ public final class SettingsWindowController: NSObject {
             row.trailingAnchor.constraint(lessThanOrEqualTo: rows.trailingAnchor, constant: -rows.edgeInsets.right).isActive = true
         }
 
-        window.title = "Settings"
+        window.title = "Clutter settings"
         window.isReleasedWhenClosed = false
         window.contentView = rows
         window.setContentSize(rows.fittingSize)
