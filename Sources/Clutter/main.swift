@@ -60,7 +60,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// A plain click shows or hides the covers; Command-click or right-click opens `menu`.
     func installStatusItem(menu: NSMenu) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "square.stack", accessibilityDescription: "Clutter")
+        let icon = NSImage(named: "MenuBarIcon")
+        icon?.isTemplate = true
+        icon?.accessibilityDescription = "Clutter"
+        item.button?.image = icon
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked(_:))
         statusItem = item
