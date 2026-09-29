@@ -2,10 +2,6 @@ import Foundation
 import Testing
 @testable import ClutterCore
 
-private func freshDefaults() -> UserDefaults {
-    UserDefaults(suiteName: "ClutterTests-\(UUID().uuidString)")!
-}
-
 @Test func coverSizesInPoints() {
     #expect(CoverSize.allCases == [.small, .medium, .large])
     #expect(CoverSize.allCases.map(\.points) == [160, 220, 300])

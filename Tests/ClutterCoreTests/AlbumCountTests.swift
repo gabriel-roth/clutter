@@ -2,10 +2,6 @@ import Foundation
 import Testing
 @testable import ClutterCore
 
-private func freshDefaults() -> UserDefaults {
-    UserDefaults(suiteName: "ClutterTests-\(UUID().uuidString)")!
-}
-
 @Test func albumCountDefaultsToTen() {
     #expect(AlbumCount.saved(in: freshDefaults()) == 10)
     #expect(AlbumCount.range == 1...100)

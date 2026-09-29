@@ -2,10 +2,6 @@ import Foundation
 import Testing
 @testable import ClutterCore
 
-private func freshDefaults() -> UserDefaults {
-    UserDefaults(suiteName: "ClutterTests-\(UUID().uuidString)")!
-}
-
 @Test func hoverInfoIsOnByDefault() {
     #expect(HoverInfo.isEnabled(in: freshDefaults()))
 }

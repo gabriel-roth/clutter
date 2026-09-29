@@ -6,6 +6,13 @@ func temporaryDirectory() -> URL {
     FileManager.default.temporaryDirectory.appending(path: "ClutterTests-\(UUID().uuidString)", directoryHint: .isDirectory)
 }
 
+/// An empty defaults suite. Naming it by a file path keeps it in the temporary directory; a plain
+/// suite name leaves a plist in ~/Library/Preferences for good, since cfprefsd writes it back even
+/// after the domain is removed and the file deleted.
+func freshDefaults() -> UserDefaults {
+    UserDefaults(suiteName: temporaryDirectory().appendingPathExtension("plist").path)!
+}
+
 /// A small valid JPEG.
 func jpegData() -> Data {
     let rep = NSBitmapImageRep(
