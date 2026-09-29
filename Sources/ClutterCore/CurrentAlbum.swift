@@ -3,37 +3,28 @@ import Foundation
 /// What Spotify is playing, as read through its AppleScript dictionary.
 public struct NowPlaying: Equatable, Sendable {
     public let trackURI: String
-    public let album: String
-    public let artist: String
-    public let artworkURL: URL
 
     public var trackID: String {
         String(trackURI.dropFirst("spotify:track:".count))
     }
 
-    /// Returns track URI, album, album artist, artist, and artwork URL on separate lines,
-    /// or "" when Spotify isn't running or is stopped. Never launches Spotify.
+    /// Returns the current track's URI, or "" when Spotify isn't running or is stopped. Never launches Spotify.
     public static let script = """
         if application "Spotify" is running then
             tell application "Spotify"
                 if player state is not stopped then
-                    set t to current track
-                    return (spotify url of t) & linefeed & (album of t) & linefeed & (album artist of t) & linefeed & (artist of t) & linefeed & (artwork url of t)
+                    return spotify url of current track
                 end if
             end tell
         end if
         return ""
         """
 
-    /// Nil for anything that isn't a Spotify catalog track (podcasts, ads, local files) or has no artwork.
+    /// Nil for anything that isn't a Spotify catalog track (podcasts, ads, local files).
     public static func parse(_ output: String) -> NowPlaying? {
-        let lines = output.components(separatedBy: "\n")
-        guard lines.count == 5,
-              lines[0].hasPrefix("spotify:track:"),
-              let artworkURL = URL(string: lines[4]), artworkURL.scheme == "https"
-        else { return nil }
-        let artist = lines[2].isEmpty ? lines[3] : lines[2]
-        return NowPlaying(trackURI: lines[0], album: lines[1], artist: artist, artworkURL: artworkURL)
+        let uri = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard uri.hasPrefix("spotify:track:") else { return nil }
+        return NowPlaying(trackURI: uri)
     }
 }
 
@@ -55,7 +46,7 @@ public enum CurrentAlbumError: Error, Equatable {
     case albumNotFound
 }
 
-/// Works out which album Spotify is playing and downloads its cover.
+/// Works out which album Spotify is playing.
 public struct CurrentAlbumFetcher: Sendable {
     private let nowPlaying: @Sendable () async -> String
     private let http: @Sendable (URL) async throws -> Data
@@ -68,7 +59,7 @@ public struct CurrentAlbumFetcher: Sendable {
         self.http = http
     }
 
-    public func fetch() async throws -> (album: Album, artwork: Data) {
+    public func fetchAlbumURI() async throws -> String {
         guard let playing = NowPlaying.parse(await nowPlaying()) else {
             throw CurrentAlbumError.nothingPlaying
         }
@@ -76,14 +67,7 @@ public struct CurrentAlbumFetcher: Sendable {
         guard let albumURI = TrackPage.albumURI(fromHTML: String(decoding: page, as: UTF8.self)) else {
             throw CurrentAlbumError.albumNotFound
         }
-        let artwork = try await http(playing.artworkURL)
-        let album = Album(
-            title: playing.album,
-            artist: playing.artist,
-            spotifyURI: albumURI,
-            artworkName: String(albumURI.dropFirst("spotify:album:".count))
-        )
-        return (album, artwork)
+        return albumURI
     }
 }
 
