@@ -305,3 +305,23 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     #expect(!controller.isHidden)
     #expect(controller.windows.allSatisfy { $0.isVisible })
 }
+
+@MainActor @Test func toggleBringsCoversForwardWhenTheyAreShowingBehindOtherWindows() {
+    let controller = makeController(store: makeStore())
+    controller.apply([a, b])
+    controller.coversAreInFront = { false }
+    controller.toggle()
+    #expect(!controller.isHidden)
+    #expect(controller.windows.allSatisfy { $0.isVisible })
+}
+
+@MainActor @Test func toggleHidesCoversThatAreInFrontAndShowsHiddenOnes() {
+    let controller = makeController(store: makeStore())
+    controller.apply([a, b])
+    controller.coversAreInFront = { true }
+    controller.toggle()
+    #expect(controller.isHidden)
+    controller.coversAreInFront = { false }
+    controller.toggle()
+    #expect(!controller.isHidden)
+}

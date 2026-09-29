@@ -50,8 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
         }
         KeyboardShortcuts.onKeyUp(for: .toggleClutter) { [weak self] in
-            guard let controller = self?.controller else { return }
-            controller.setHidden(!controller.isHidden)
+            self?.controller?.toggle()
         }
         KeyboardShortcuts.onKeyUp(for: .addCurrentAlbum) { [weak self] in
             self?.addCurrentAlbum(nil)
@@ -76,7 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        controller?.setHidden(!(controller?.isHidden ?? true))
+        controller?.toggle()
     }
 
     @objc func showAbout(_ sender: Any?) {

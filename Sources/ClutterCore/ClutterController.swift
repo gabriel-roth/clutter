@@ -16,6 +16,9 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     /// Albums whose covers were removed and whose removal from Spotify hasn't finished; `apply` leaves them out.
     private var removing: Set<String> = []
 
+    /// Whether the topmost ordinary window on screen is one of ours; injectable for tests.
+    var coversAreInFront: () -> Bool = { WindowStack.topWindowBelongs(toProcess: ProcessInfo.processInfo.processIdentifier) }
+
     private let store: LibraryStore
     private let artwork: ArtworkStore
     private let player: SpotifyPlayer
@@ -69,6 +72,18 @@ public final class ClutterController: NSObject, NSWindowDelegate {
             windows.forEach { $0.orderOut(nil) }
         } else {
             showWindows()
+        }
+    }
+
+    /// Hides the covers if they're showing in front, shows them if they're hidden, and brings them
+    /// to the front if they're showing behind other apps' windows.
+    public func toggle() {
+        if isHidden {
+            setHidden(false)
+        } else if !windows.isEmpty, !coversAreInFront() {
+            showWindows()
+        } else {
+            setHidden(true)
         }
     }
 
