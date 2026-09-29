@@ -114,3 +114,12 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     let settings = SettingsWindowController(albumCount: 10, showsInfoOnHover: false)
     #expect(settings.showsInfoOnHoverCheckbox.state == .off)
 }
+
+@MainActor @Test func everyRowKeepsAMarginFromTheWindowsRightEdge() throws {
+    let settings = SettingsWindowController(albumCount: 10)
+    let rows = try #require(settings.window.contentView as? NSStackView)
+    rows.layoutSubtreeIfNeeded()
+    for row in rows.arrangedSubviews {
+        #expect(rows.bounds.maxX - row.frame.maxX >= 20)
+    }
+}

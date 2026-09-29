@@ -77,6 +77,11 @@ public final class SettingsWindowController: NSObject {
         rows.alignment = .leading
         rows.spacing = 12
         rows.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        // Leading-aligned rows only weakly respect the right inset, so the window would size itself
+        // with the widest row flush against its edge.
+        for row in rows.arrangedSubviews {
+            row.trailingAnchor.constraint(lessThanOrEqualTo: rows.trailingAnchor, constant: -rows.edgeInsets.right).isActive = true
+        }
 
         window.title = "Settings"
         window.isReleasedWhenClosed = false
