@@ -102,6 +102,8 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     var reported: [Bool] = []
     let settings = SettingsWindowController(albumCount: 10, showsInfoOnHover: true, onShowsInfoOnHoverChange: { reported.append($0) })
     #expect(settings.showsInfoOnHoverCheckbox.state == .on)
+    #expect(settings.showsInfoOnHoverCheckbox.title == "Show album info")
+    #expect(settings.showsInfoOnHoverCheckbox.imagePosition == .imageTrailing)
     #expect(allSubviews(of: settings.window.contentView).contains { $0 === settings.showsInfoOnHoverCheckbox })
     settings.showsInfoOnHoverCheckbox.state = .off
     settings.showsInfoOnHoverChanged(settings.showsInfoOnHoverCheckbox)

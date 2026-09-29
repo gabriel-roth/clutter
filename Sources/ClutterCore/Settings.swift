@@ -17,7 +17,7 @@ public final class SettingsWindowController: NSObject {
     public let window: NSWindow
     let albumCountField = NSTextField()
     let albumCountStepper = NSStepper()
-    let showsInfoOnHoverCheckbox = NSButton(checkboxWithTitle: "Show artist and title on hover", target: nil, action: nil)
+    let showsInfoOnHoverCheckbox = NSButton(checkboxWithTitle: "Show album info", target: nil, action: nil)
     private var albumCount: Int
     private let onAlbumCountChange: @MainActor (Int) -> Void
     private let onShowsInfoOnHoverChange: @MainActor (Bool) -> Void
@@ -62,6 +62,7 @@ public final class SettingsWindowController: NSObject {
         countRow.spacing = 8
 
         showsInfoOnHoverCheckbox.state = showsInfoOnHover ? .on : .off
+        showsInfoOnHoverCheckbox.imagePosition = .imageTrailing
         showsInfoOnHoverCheckbox.target = self
         showsInfoOnHoverCheckbox.action = #selector(showsInfoOnHoverChanged(_:))
 
