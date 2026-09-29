@@ -57,7 +57,7 @@ public final class SettingsWindowController: NSObject {
         albumCountStepper.target = self
         albumCountStepper.action = #selector(stepperChanged(_:))
 
-        let countRow = NSStackView(views: [NSTextField(labelWithString: "Albums on desktop:"), albumCountField, albumCountStepper])
+        let countRow = NSStackView(views: [NSTextField(labelWithString: "Number of albums to show:"), albumCountField, albumCountStepper])
         countRow.orientation = .horizontal
         countRow.spacing = 8
 
