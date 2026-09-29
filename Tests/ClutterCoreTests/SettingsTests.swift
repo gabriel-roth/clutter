@@ -59,6 +59,40 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     #expect(reported.isEmpty)
 }
 
+@MainActor @Test func typingAValidCountUpdatesTheStepperAndReportsOnce() async throws {
+    var reported: [Int] = []
+    let settings = SettingsWindowController(albumCount: 10, onAlbumCountChange: { reported.append($0) })
+    settings.albumCountField.stringValue = "25"
+    settings.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: settings.albumCountField))
+    #expect(settings.albumCountStepper.integerValue == 25)
+    #expect(reported.isEmpty)
+    try await Task.sleep(for: SettingsWindowController.changeDelay + .milliseconds(300))
+    #expect(reported == [25])
+}
+
+@MainActor @Test func typingAnInvalidCountIsIgnored() async throws {
+    var reported: [Int] = []
+    let settings = SettingsWindowController(albumCount: 10, onAlbumCountChange: { reported.append($0) })
+    for text in ["500", "", "abc"] {
+        settings.albumCountField.stringValue = text
+        settings.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: settings.albumCountField))
+        #expect(settings.albumCountStepper.integerValue == 10)
+    }
+    try await Task.sleep(for: SettingsWindowController.changeDelay + .milliseconds(300))
+    #expect(reported.isEmpty)
+}
+
+@MainActor @Test func committingAnEmptyFieldRevertsToTheCurrentCount() async throws {
+    var reported: [Int] = []
+    let settings = SettingsWindowController(albumCount: 10, onAlbumCountChange: { reported.append($0) })
+    settings.albumCountField.stringValue = ""
+    settings.fieldChanged(settings.albumCountField)
+    #expect(settings.albumCountField.integerValue == 10)
+    #expect(settings.albumCountStepper.integerValue == 10)
+    try await Task.sleep(for: SettingsWindowController.changeDelay + .milliseconds(300))
+    #expect(reported.isEmpty)
+}
+
 @Test func addCurrentAlbumShortcutName() {
     #expect(KeyboardShortcuts.Name.addCurrentAlbum.rawValue == "addCurrentAlbum")
 }

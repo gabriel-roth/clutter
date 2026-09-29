@@ -81,12 +81,16 @@ public final class SettingsWindowController: NSObject {
     }
 
     @objc func fieldChanged(_ sender: NSTextField) {
-        setAlbumCount(sender.integerValue)
+        guard let value = Int(sender.stringValue.trimmingCharacters(in: .whitespaces)) else {
+            albumCountField.integerValue = albumCount
+            return
+        }
+        setAlbumCount(value)
     }
 
     private func setAlbumCount(_ count: Int) {
         let count = AlbumCount.clamped(count)
-        albumCountField.integerValue = count
+        if albumCountField.integerValue != count { albumCountField.integerValue = count }
         albumCountStepper.integerValue = count
         guard count != albumCount else { return }
         albumCount = count
@@ -102,8 +106,6 @@ public final class SettingsWindowController: NSObject {
 extension SettingsWindowController: NSTextFieldDelegate {
     public func controlTextDidChange(_ notification: Notification) {
         guard let value = Int(albumCountField.stringValue), AlbumCount.range.contains(value) else { return }
-        albumCountStepper.integerValue = value
-        guard value != albumCount else { return }
         setAlbumCount(value)
     }
 }
