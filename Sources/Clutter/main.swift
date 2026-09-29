@@ -110,6 +110,9 @@ let addItem = NSMenuItem(title: "Add Currently Playing Album", action: #selector
 addItem.target = delegate
 addItem.setShortcut(for: .addCurrentAlbum)
 fileMenu.addItem(addItem)
+fileMenu.addItem(.separator())
+// NSWindow disables this for the borderless covers, so Command-W only closes Settings.
+fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
 let fileMenuItem = NSMenuItem()
 fileMenuItem.submenu = fileMenu
 mainMenu.addItem(fileMenuItem)
