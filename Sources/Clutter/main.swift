@@ -72,7 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         statusClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak item] event in
             guard let button = item?.button, event.window === button.window,
                   event.type == .rightMouseDown || event.modifierFlags.contains(.command) else { return event }
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+            // Attaching the menu just for this click gets the system's own placement under the icon,
+            // which a popUp at a guessed point doesn't.
+            item?.menu = menu
+            button.performClick(nil)
+            item?.menu = nil
             return nil
         }
     }
