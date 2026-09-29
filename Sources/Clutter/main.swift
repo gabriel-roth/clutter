@@ -9,6 +9,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private lazy var spotifyLibrary = SpotifyLibrary(accessToken: { [auth] in try await auth.validAccessToken() })
     private lazy var spotifySignIn = SpotifySignIn(auth: auth)
     private var controller: ClutterController?
+    /// The standard About panel isn't ours to subclass, so Command-W is handled by a key monitor.
+    private var aboutPanel: NSWindow?
+    private var closeAboutOnCommandW: Any?
     private var sync: LibrarySync?
     private lazy var settings = SettingsWindowController(
         albumCount: AlbumCount.saved(in: .standard),
@@ -63,8 +66,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             style.alignment = .center
             return style
         }(), range: NSRange(location: 0, length: credits.length))
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
         NSApp.activate()
+        // AppKit may build a fresh panel after the last one closed, so re-identify it on every open.
+        aboutPanel = NSApp.windows.first { !before.contains(ObjectIdentifier($0)) && $0 is NSPanel } ?? aboutPanel
+        if closeAboutOnCommandW == nil {
+            closeAboutOnCommandW = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let panel = self?.aboutPanel, panel.isKeyWindow,
+                      event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                      event.charactersIgnoringModifiers == "w" else { return event }
+                panel.performClose(nil)
+                return nil
+            }
+        }
     }
 
     @objc func showSettings(_ sender: Any?) {
