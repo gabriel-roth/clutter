@@ -57,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
-    /// A plain click shows or hides the covers; Command-click opens `menu`.
+    /// A plain click shows or hides the covers; Command-click or right-click opens `menu`.
     func installStatusItem(menu: NSMenu) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "square.stack", accessibilityDescription: "Clutter")
@@ -65,10 +65,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         item.button?.action = #selector(statusItemClicked(_:))
         statusItem = item
         // The system claims Command-clicks on menu bar icons (for rearranging them) and never sends the
-        // button's action, but the mouse-down still reaches the app, so catch it here.
-        statusClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak item] event in
+        // button's action, but the mouse-down still reaches the app, so catch it here, along with right-clicks.
+        statusClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak item] event in
             guard let button = item?.button, event.window === button.window,
-                  event.modifierFlags.contains(.command) else { return event }
+                  event.type == .rightMouseDown || event.modifierFlags.contains(.command) else { return event }
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
             return nil
         }
