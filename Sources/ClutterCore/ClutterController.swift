@@ -8,6 +8,9 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     public private(set) var library: Library
     public private(set) var windows: [AlbumWindow] = []
+    /// Closed windows kept alive until the current event finishes: a cover is closed from its own
+    /// close button's action, which must not find its window (and button) freed underneath it.
+    private(set) var closingWindows: [AlbumWindow] = []
 
     private let store: LibraryStore
     private let artwork: ArtworkStore
@@ -82,6 +85,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         let window = windows.remove(at: index)
         window.delegate = nil
         window.close()
+        closingWindows.append(window)
+        Task { @MainActor [weak self] in self?.closingWindows.removeAll() }
     }
 
     private func makeWindow(for entry: Library.Entry) -> AlbumWindow {

@@ -117,3 +117,13 @@ private let custom = Album(title: "Custom", artist: "Someone", spotifyURI: "spot
     #expect(controller.windows.count == 6)
     #expect(store.load()?.entries.count == 6)
 }
+
+@MainActor @Test func closedCoverWindowIsKeptAliveUntilTheCurrentEventFinishes() async {
+    let controller = makeController(store: makeStore())
+    let window = controller.windows[0]
+    window.albumView.onClose?()
+    // The close button's action is still running when this returns, so its window must not be released yet.
+    #expect(controller.closingWindows == [window])
+    try? await Task.sleep(for: .milliseconds(50))
+    #expect(controller.closingWindows.isEmpty)
+}
