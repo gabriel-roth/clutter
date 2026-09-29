@@ -1,6 +1,6 @@
 import AppKit
 
-/// Shows one album cover. Drag to move the window; double-click to play. Hovering shows the artist
+/// Shows one album cover. Drag to move the window; double-click to play, which flashes the banner. Hovering shows the artist
 /// and title along the bottom, unless `showsInfoOnHover` is off. Hovering with Option held shows a
 /// close button, which asks whether to remove the album from the Spotify library.
 public final class AlbumView: NSView {
@@ -46,7 +46,13 @@ public final class AlbumView: NSView {
             needsDisplay = true
         }
     }
-    var isShowingInfo: Bool { isHovering && showsInfoOnHover && !isConfirmingRemoval }
+    /// True for a moment after a double-click, so the banner lights up even when hover info is off.
+    private(set) var isFlashingInfo = false {
+        didSet { needsDisplay = true }
+    }
+    static let flashDuration: TimeInterval = 0.25
+    private var flashTimer: Timer?
+    var isShowingInfo: Bool { (isHovering && showsInfoOnHover || isFlashingInfo) && !isConfirmingRemoval }
     var isShowingCloseButton: Bool { isHovering && isOptionDown && !isConfirmingRemoval }
 
     let removeButton = FirstClickButton(title: "Remove", target: nil, action: nil)
@@ -156,12 +162,16 @@ public final class AlbumView: NSView {
             .paragraphStyle: paragraph,
         ]))
 
+        if isFlashingInfo {
+            text.addAttribute(.foregroundColor, value: NSColor.black, range: NSRange(location: 0, length: text.length))
+        }
+
         let padding: CGFloat = 10
         let available = coverBounds.insetBy(dx: padding + 4, dy: padding)
         let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .truncatesLastVisibleLine]
         let height = min(ceil(text.boundingRect(with: available.size, options: options).height), available.height)
 
-        NSColor.black.withAlphaComponent(0.65).setFill()
+        (isFlashingInfo ? NSColor.white.withAlphaComponent(0.9) : NSColor.black.withAlphaComponent(0.65)).setFill()
         NSRect(x: coverBounds.minX, y: coverBounds.minY, width: coverBounds.width, height: height + padding * 2).fill(using: .sourceOver)
         text.draw(with: NSRect(x: available.minX, y: coverBounds.minY + padding, width: available.width, height: height), options: options)
     }
@@ -259,6 +269,17 @@ public final class AlbumView: NSView {
         needsLayout = true
     }
 
+    /// Briefly inverts the banner to show a double-click was received.
+    private func flashInfo() {
+        isFlashingInfo = true
+        flashTimer?.invalidate()
+        let timer = Timer(timeInterval: Self.flashDuration, repeats: false) { [weak self] _ in
+            self?.isFlashingInfo = false
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        flashTimer = timer
+    }
+
     @objc private func confirmRemoval() {
         isConfirmingRemoval = false
         onRemove?()
@@ -333,6 +354,7 @@ public final class AlbumView: NSView {
         }
         onMouseDown?()
         if event.clickCount == 2, !isConfirmingRemoval {
+            flashInfo()
             onDoubleClick?()
         } else {
             window?.performDrag(with: event)

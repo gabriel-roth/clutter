@@ -18,6 +18,20 @@ private func mouseDown(clickCount: Int) -> NSEvent {
     #expect(fired == 1)
 }
 
+@MainActor @Test func doubleClickFlashesBannerEvenWithHoverInfoOff() {
+    let view = AlbumView(image: nil, artist: "A", title: "T")
+    view.showsInfoOnHover = false
+    view.mouseDown(with: mouseDown(clickCount: 2))
+    #expect(view.isFlashingInfo)
+    #expect(view.isShowingInfo)
+}
+
+@MainActor @Test func singleClickDoesNotFlashBanner() {
+    let view = AlbumView(image: nil, artist: "A", title: "T")
+    view.mouseDown(with: mouseDown(clickCount: 1))
+    #expect(!view.isFlashingInfo)
+}
+
 @MainActor @Test func singleClickDoesNotFireCallback() {
     let view = AlbumView(image: nil)
     var fired = 0
