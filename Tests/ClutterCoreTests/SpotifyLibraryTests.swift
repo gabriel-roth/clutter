@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import ClutterCore
 
-private func makeLibrary(_ http: FakeHTTP) -> SpotifyLibrary {
-    SpotifyLibrary(accessToken: { "TOKEN" }, http: { try http.handle($0) })
+private func makeLibrary(_ http: FakeHTTP, sleeps: Box<[Duration]> = Box([])) -> SpotifyLibrary {
+    SpotifyLibrary(accessToken: { "TOKEN" }, http: { try http.handle($0) }, sleep: { sleeps.value.append($0) })
 }
 
 /// One `items` entry of GET /me/albums, trimmed to the fields Clutter reads plus a few it ignores.
@@ -112,5 +112,45 @@ private func page(_ items: [String], next: String? = nil) -> String {
 @Test func bumpingAnUnsavedAlbumJustSavesIt() async throws {
     let http = FakeHTTP([(200, "[false]"), (200, "")])
     try await makeLibrary(http).bumpToMostRecent(albumURI: "spotify:album:abc")
+    #expect(http.recorded.map(\.httpMethod) == ["GET", "PUT"])
+}
+
+@Test func reSavingAfterARemoveRetriesAFailedSaveAfterASecond() async throws {
+    let http = FakeHTTP([(200, "[true]"), (200, ""), (500, "oops"), (200, "")])
+    let sleeps = Box<[Duration]>([])
+    try await makeLibrary(http, sleeps: sleeps).bumpToMostRecent(albumURI: "spotify:album:abc")
+    #expect(http.recorded.map(\.httpMethod) == ["GET", "DELETE", "PUT", "PUT"])
+    #expect(sleeps.value == [.seconds(1)])
+}
+
+@Test func reSavingWaitsAsLongAsARateLimitAsks() async throws {
+    let http = FakeHTTP(withHeaders: [(200, "[true]", [:]), (200, "", [:]), (429, "", ["Retry-After": "3"]), (200, "", [:])])
+    let sleeps = Box<[Duration]>([])
+    try await makeLibrary(http, sleeps: sleeps).bumpToMostRecent(albumURI: "spotify:album:abc")
+    #expect(sleeps.value == [.seconds(3)])
+}
+
+@Test func reSavingCapsARateLimitWaitAndDefaultsAMissingOne() async throws {
+    let http = FakeHTTP(withHeaders: [(200, "[true]", [:]), (200, "", [:]), (429, "", ["Retry-After": "3600"]), (429, "", [:]), (200, "", [:])])
+    let sleeps = Box<[Duration]>([])
+    try await makeLibrary(http, sleeps: sleeps).bumpToMostRecent(albumURI: "spotify:album:abc")
+    #expect(sleeps.value == [.seconds(10), .seconds(1)])
+}
+
+@Test func reSavingGivesUpAfterThreeTries() async {
+    let http = FakeHTTP([(200, "[true]"), (200, ""), (500, ""), (500, ""), (500, "")])
+    let sleeps = Box<[Duration]>([])
+    await #expect(throws: SpotifyLibraryError.removedButNotSaved(albumURI: "spotify:album:abc")) {
+        try await makeLibrary(http, sleeps: sleeps).bumpToMostRecent(albumURI: "spotify:album:abc")
+    }
+    #expect(http.recorded.filter { $0.httpMethod == "PUT" }.count == 3)
+    #expect(sleeps.value == [.seconds(1), .seconds(2)])
+}
+
+@Test func savingAnUnsavedAlbumDoesNotRetry() async {
+    let http = FakeHTTP([(200, "[false]"), (500, "oops")])
+    await #expect(throws: SpotifyLibraryError.requestFailed(status: 500, body: "oops")) {
+        try await makeLibrary(http).bumpToMostRecent(albumURI: "spotify:album:abc")
+    }
     #expect(http.recorded.map(\.httpMethod) == ["GET", "PUT"])
 }

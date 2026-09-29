@@ -65,6 +65,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 try await spotifyLibrary.bumpToMostRecent(albumURI: albumURI)
                 await sync?.refresh().value
                 controller?.bringToFront(spotifyURI: albumURI)
+            } catch SpotifyLibraryError.removedButNotSaved {
+                let alert = NSAlert()
+                alert.messageText = "Couldn't save the album again"
+                alert.informativeText = "Clutter removed the playing album from your Spotify library to move it to the top, but couldn't save it again. Press Add Currently Playing Album again while it's still playing."
+                NSApp.activate()
+                alert.runModal()
             } catch {
                 NSLog("Clutter: couldn't add the current album: %@", String(describing: error))
                 NSSound.beep()

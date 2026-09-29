@@ -15,8 +15,11 @@ public struct SavedAlbum: Equatable, Sendable {
 }
 
 public enum SpotifyLibraryError: Error, Equatable {
-    case requestFailed(status: Int, body: String)
+    /// `retryAfter` is the Retry-After header's seconds, when the reply has a readable one.
+    case requestFailed(status: Int, body: String, retryAfter: Int? = nil)
     case malformedResponse
+    /// The album was removed to move it to the top, but saving it again kept failing.
+    case removedButNotSaved(albumURI: String)
 }
 
 /// Reads and edits the albums saved in the user's Spotify library through the Web API.
@@ -28,13 +31,16 @@ public struct SpotifyLibrary: Sendable {
 
     private let accessToken: @Sendable () async throws -> String
     private let http: HTTP
+    private let sleep: @Sendable (Duration) async throws -> Void
 
     public init(
         accessToken: @escaping @Sendable () async throws -> String,
-        http: @escaping HTTP = { try await URLSession.shared.data(for: $0) }
+        http: @escaping HTTP = { try await URLSession.shared.data(for: $0) },
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.accessToken = accessToken
         self.http = http
+        self.sleep = sleep
     }
 
     /// Up to `count` of the most recently saved albums, newest first.
@@ -70,11 +76,31 @@ public struct SpotifyLibrary: Sendable {
     }
 
     /// Saves the album, first removing it if it's already saved so it becomes the most recently added.
+    /// After a remove, a failed save is tried twice more, since giving up would leave the album
+    /// out of the library; if every try fails this throws `.removedButNotSaved`.
     public func bumpToMostRecent(albumURI: String) async throws {
-        if try await contains(albumURI: albumURI) {
-            try await remove(albumURI: albumURI)
+        guard try await contains(albumURI: albumURI) else {
+            return try await save(albumURI: albumURI)
         }
-        try await save(albumURI: albumURI)
+        try await remove(albumURI: albumURI)
+        let backoff: [Duration] = [.seconds(1), .seconds(2)]
+        for attempt in 0...backoff.count {
+            do {
+                return try await save(albumURI: albumURI)
+            } catch {
+                NSLog("Clutter: couldn't re-save %@ (try %d): %@", albumURI, attempt + 1, String(describing: error))
+                guard attempt < backoff.count else { break }
+                // A cancelled wait still leaves the album removed, so it ends up reported the same way.
+                do { try await sleep(Self.retryDelay(after: error, default: backoff[attempt])) } catch { break }
+            }
+        }
+        throw SpotifyLibraryError.removedButNotSaved(albumURI: albumURI)
+    }
+
+    /// A rate limit's Retry-After, capped at 10 seconds (1 if missing); otherwise `fallback`.
+    private static func retryDelay(after error: any Error, default fallback: Duration) -> Duration {
+        guard case SpotifyLibraryError.requestFailed(429, _, let retryAfter) = error else { return fallback }
+        return .seconds(min(retryAfter ?? 1, 10))
     }
 
     private func send(_ method: String, _ path: String, query: [(String, String)]) async throws -> Data {
@@ -90,7 +116,10 @@ public struct SpotifyLibrary: Sendable {
         let (data, response) = try await http(request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
-            throw SpotifyLibraryError.requestFailed(status: status, body: String(decoding: data, as: UTF8.self))
+            let retryAfter = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Retry-After")
+                .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+                .flatMap { $0 >= 0 ? $0 : nil }
+            throw SpotifyLibraryError.requestFailed(status: status, body: String(decoding: data, as: UTF8.self), retryAfter: retryAfter)
         }
         return data
     }

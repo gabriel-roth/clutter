@@ -57,10 +57,15 @@ final class Box<Value>: @unchecked Sendable {
 /// Throws once the replies run out, so an unexpected call fails the test.
 final class FakeHTTP: @unchecked Sendable {
     private let lock = NSLock()
-    private var replies: [(status: Int, body: String)]
+    private var replies: [(status: Int, body: String, headers: [String: String])]
     private var requests: [URLRequest] = []
 
     init(_ replies: [(status: Int, body: String)]) {
+        self.replies = replies.map { ($0.status, $0.body, [:]) }
+    }
+
+    /// Replies that also carry response headers.
+    init(withHeaders replies: [(status: Int, body: String, headers: [String: String])]) {
         self.replies = replies
     }
 
@@ -73,7 +78,7 @@ final class FakeHTTP: @unchecked Sendable {
             requests.append(request)
             guard !replies.isEmpty else { throw URLError(.resourceUnavailable) }
             let reply = replies.removeFirst()
-            let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: nil)!
+            let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: reply.headers)!
             return (Data(reply.body.utf8), response)
         }
     }
