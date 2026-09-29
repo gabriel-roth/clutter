@@ -164,3 +164,32 @@ private let approve: @Sendable (URL) async throws -> URL = { url in
         try await auth.validAccessToken()
     }
 }
+
+@Test func concurrentRefreshesShareOneRequest() async throws {
+    let store = MemoryTokenStore(SpotifyTokens(accessToken: "OLD", refreshToken: "RT", expiresAt: t0))
+    let http = FakeHTTP([(200, #"{"access_token":"NEW","expires_in":3600,"refresh_token":"RT2"}"#)])
+    let auth = SpotifyAuth(config: config, store: store, http: { request in
+        await Task.yield()
+        return try http.handle(request)
+    }, now: { t0 })
+    async let first = auth.validAccessToken()
+    async let second = auth.validAccessToken()
+    let tokens = try await [first, second]
+    #expect(tokens == ["NEW", "NEW"])
+    #expect(http.recorded.count == 1)
+    #expect(store.load()?.refreshToken == "RT2")
+}
+
+@Test func expiredRefreshDoesNotDeleteTokensSavedMeanwhile() async {
+    let store = MemoryTokenStore(SpotifyTokens(accessToken: "OLD", refreshToken: "RT", expiresAt: t0))
+    let fresh = SpotifyTokens(accessToken: "FRESH-AT", refreshToken: "FRESH", expiresAt: t0 + 3600)
+    let auth = SpotifyAuth(config: config, store: store, http: { request in
+        try store.save(fresh)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!
+        return (Data(#"{"error":"invalid_grant"}"#.utf8), response)
+    }, now: { t0 })
+    await #expect(throws: SpotifyAuthError.authorizationExpired) {
+        try await auth.validAccessToken()
+    }
+    #expect(store.load() == fresh)
+}

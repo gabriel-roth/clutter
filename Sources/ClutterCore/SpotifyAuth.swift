@@ -35,6 +35,7 @@ public actor SpotifyAuth {
     private let store: SpotifyTokenStore
     private let http: HTTP
     private let now: @Sendable () -> Date
+    private var refreshTask: Task<SpotifyTokens, Error>?
 
     public init(
         config: SpotifyAuthConfig = .clutter,
@@ -109,13 +110,35 @@ public actor SpotifyAuth {
         if tokens.isFresh(at: now()) {
             return tokens.accessToken
         }
-        let refreshed = try await requestTokens([
-            "grant_type": "refresh_token",
-            "refresh_token": tokens.refreshToken,
-            "client_id": config.clientID,
-        ], previousRefreshToken: tokens.refreshToken)
-        try store.save(refreshed)
-        return refreshed.accessToken
+        // Callers that find the token stale while a refresh is running share that refresh.
+        let task: Task<SpotifyTokens, Error>
+        if let running = refreshTask {
+            task = running
+        } else {
+            task = Task { try await self.refresh(tokens) }
+            refreshTask = task
+        }
+        return try await task.value.accessToken
+    }
+
+    private func refresh(_ tokens: SpotifyTokens) async throws -> SpotifyTokens {
+        defer { refreshTask = nil }
+        do {
+            let refreshed = try await requestTokens([
+                "grant_type": "refresh_token",
+                "refresh_token": tokens.refreshToken,
+                "client_id": config.clientID,
+            ], previousRefreshToken: tokens.refreshToken)
+            try store.save(refreshed)
+            return refreshed
+        } catch SpotifyAuthError.tokenRequestFailed(let status, let body) where status == 400 && body.contains(#""invalid_grant""#) {
+            // Spotify ends an authorization after six months, or when the user revokes it.
+            // Forget the tokens only if a sign-in hasn't replaced them in the meantime.
+            if store.load()?.refreshToken == tokens.refreshToken {
+                store.delete()
+            }
+            throw SpotifyAuthError.authorizationExpired
+        }
     }
 
     private func requestTokens(_ form: [String: String], previousRefreshToken: String?) async throws -> SpotifyTokens {
@@ -127,11 +150,6 @@ public actor SpotifyAuth {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else {
             let body = String(decoding: data, as: UTF8.self)
-            // Spotify ends an authorization after six months, or when the user revokes it.
-            if form["grant_type"] == "refresh_token", status == 400, body.contains(#""invalid_grant""#) {
-                store.delete()
-                throw SpotifyAuthError.authorizationExpired
-            }
             throw SpotifyAuthError.tokenRequestFailed(status: status, body: body)
         }
         guard let reply = try? JSONDecoder().decode(TokenResponse.self, from: data) else {
