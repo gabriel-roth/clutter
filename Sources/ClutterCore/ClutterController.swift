@@ -64,8 +64,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         store.save(library)
     }
 
-    /// Shows exactly `albums` (newest first): covers already shown stay where they are, the rest
-    /// leave, and new ones appear at random spots above everything else, newest highest.
+    /// Shows exactly `albums` (newest first): covers already shown stay where they are, neither moved
+    /// nor reordered; the rest leave, and new ones appear at random spots above everything else, newest highest.
     /// A cover whose album details changed is rebuilt in place; a placeholder cover takes artwork cached since.
     public func apply(_ albums: [Album]) {
         library.reconcile(with: albums, newOrigin: randomOrigin)
@@ -85,7 +85,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
             return makeWindow(for: entry)
         }
         old.filter { !reused.contains(ObjectIdentifier($0)) }.forEach(close)
-        showWindows()
+        // Only new covers come forward; the rest stay wherever they are among other apps' windows.
+        windows.filter { !reused.contains(ObjectIdentifier($0)) }.forEach { $0.orderFrontRegardless() }
     }
 
     /// Brings the album's cover to the front, if it's shown.

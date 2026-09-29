@@ -219,3 +219,20 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     #expect(controller.windows.map(\.album) == [a])
     #expect(store.load() == Library(entries: [.init(album: a, origin: CGPoint(x: 700, y: 200))]))
 }
+
+@MainActor @Test func applyOrdersFrontOnlyNewCoversAndLeavesTheRestWhereTheyAre() {
+    let store = makeStore()
+    store.save(Library(entries: [a, b].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
+    let controller = makeController(store: store)
+    controller.showWindows()
+    let (windowA, windowB) = (controller.windows[0], controller.windows[1])
+    windowA.orderFrontRegardless()  // Out of step with the saved order, as if another app's window came between.
+    controller.apply([d, c, b, a])
+    let (windowC, windowD) = (controller.windows[2], controller.windows[3])
+    #expect(windowC.isVisible && windowD.isVisible)
+    // Front to back: the new covers, newest first, then the old ones in the order they were left in.
+    let order = (NSWindow.windowNumbers(options: []) ?? []).map(\.intValue)
+    let ours = [windowD, windowC, windowA, windowB].map(\.windowNumber)
+    #expect(order.filter(ours.contains) == ours)
+    controller.apply([])
+}
