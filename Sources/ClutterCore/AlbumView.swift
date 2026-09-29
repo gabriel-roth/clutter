@@ -1,7 +1,7 @@
 import AppKit
 
-/// Shows one album cover. Drag to move the window; double-click to play. Hovering dims the cover
-/// and shows the artist and title, unless `showsInfoOnHover` is off.
+/// Shows one album cover. Drag to move the window; double-click to play. Hovering shows the artist
+/// and title along the bottom, unless `showsInfoOnHover` is off.
 public final class AlbumView: NSView {
     /// Nil shows a gray placeholder.
     public var image: NSImage? {
@@ -49,30 +49,37 @@ public final class AlbumView: NSView {
         image.draw(in: NSRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2, width: width, height: height))
     }
 
-    /// Dims the cover and centers the artist over the title, wrapping and truncating to fit.
-    private func drawInfo() {
-        NSColor.black.withAlphaComponent(0.65).setFill()
-        bounds.fill(using: .sourceOver)
+    static let artistFont = NSFont.systemFont(ofSize: 15, weight: .semibold)
+    static let titleFont: NSFont = {
+        let base = NSFont.systemFont(ofSize: 13)
+        return NSFont(descriptor: base.fontDescriptor.withSymbolicTraits(.italic), size: base.pointSize) ?? base
+    }()
 
+    /// Dims a band along the bottom, just tall enough for the artist over the title, which wrap and
+    /// truncate to fit the cover.
+    private func drawInfo() {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         paragraph.lineBreakMode = .byWordWrapping
         let text = NSMutableAttributedString(string: artist, attributes: [
-            .font: NSFont.systemFont(ofSize: 15, weight: .semibold),
+            .font: Self.artistFont,
             .foregroundColor: NSColor.white,
             .paragraphStyle: paragraph,
         ])
         text.append(NSAttributedString(string: "\n" + title, attributes: [
-            .font: NSFont.systemFont(ofSize: 13),
+            .font: Self.titleFont,
             .foregroundColor: NSColor.white.withAlphaComponent(0.85),
             .paragraphStyle: paragraph,
         ]))
 
-        let available = bounds.insetBy(dx: 14, dy: 14)
+        let padding: CGFloat = 10
+        let available = bounds.insetBy(dx: padding + 4, dy: padding)
         let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .truncatesLastVisibleLine]
         let height = min(ceil(text.boundingRect(with: available.size, options: options).height), available.height)
-        let rect = NSRect(x: available.minX, y: available.midY - height / 2, width: available.width, height: height)
-        text.draw(with: rect, options: options)
+
+        NSColor.black.withAlphaComponent(0.65).setFill()
+        NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: height + padding * 2).fill(using: .sourceOver)
+        text.draw(with: NSRect(x: available.minX, y: bounds.minY + padding, width: available.width, height: height), options: options)
     }
 
     public override func updateTrackingAreas() {

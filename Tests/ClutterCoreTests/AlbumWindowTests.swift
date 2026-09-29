@@ -79,24 +79,37 @@ private func whiteImage() -> NSImage {
     return image
 }
 
-/// Brightness of the view's corner pixel, away from any overlay text.
+/// Brightness of each pixel row, top to bottom, at the view's left edge, away from any overlay text.
 @MainActor
-private func cornerBrightness(of view: AlbumView) -> CGFloat {
+private func edgeBrightness(of view: AlbumView) -> [CGFloat] {
     let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
     view.cacheDisplay(in: view.bounds, to: rep)
-    return rep.colorAt(x: 2, y: 2)!.usingColorSpace(.deviceRGB)!.brightnessComponent
+    return (0..<rep.pixelsHigh).map { rep.colorAt(x: 1, y: $0)!.usingColorSpace(.deviceRGB)!.brightnessComponent }
+}
+
+/// Brightness of the view's top and bottom edges, away from any overlay text.
+@MainActor
+private func topAndBottomBrightness(of view: AlbumView) -> (top: CGFloat, bottom: CGFloat) {
+    let rows = edgeBrightness(of: view)
+    return (rows[1], rows[rows.count - 2])
+}
+
+/// How many pixel rows the overlay band covers.
+@MainActor
+private func bandHeight(of view: AlbumView) -> Int {
+    edgeBrightness(of: view).filter { $0 < 0.5 }.count
 }
 
 @MainActor @Test func hoveringDimsTheCoverUntilTheMouseLeaves() {
     let view = AlbumView(image: whiteImage(), artist: "Artist", title: "Title")
     view.frame = CGRect(x: 0, y: 0, width: 160, height: 160)
-    #expect(cornerBrightness(of: view) > 0.95)
+    #expect(topAndBottomBrightness(of: view).bottom > 0.95)
     view.mouseEntered(with: enterExit(.mouseEntered))
     #expect(view.isShowingInfo)
-    #expect(cornerBrightness(of: view) < 0.5)
+    #expect(topAndBottomBrightness(of: view).bottom < 0.5)
     view.mouseExited(with: enterExit(.mouseExited))
     #expect(!view.isShowingInfo)
-    #expect(cornerBrightness(of: view) > 0.95)
+    #expect(topAndBottomBrightness(of: view).bottom > 0.95)
 }
 
 @MainActor @Test func hoveringShowsNothingWhenInfoIsTurnedOff() {
@@ -105,7 +118,7 @@ private func cornerBrightness(of view: AlbumView) -> CGFloat {
     view.showsInfoOnHover = false
     view.mouseEntered(with: enterExit(.mouseEntered))
     #expect(!view.isShowingInfo)
-    #expect(cornerBrightness(of: view) > 0.95)
+    #expect(topAndBottomBrightness(of: view).bottom > 0.95)
     view.showsInfoOnHover = true
     #expect(view.isShowingInfo)
 }
@@ -122,4 +135,21 @@ private func cornerBrightness(of view: AlbumView) -> CGFloat {
     let window = AlbumWindow(album: album, image: nil, frame: CGRect(x: 0, y: 0, width: 160, height: 160))
     #expect(window.albumView.artist == "A")
     #expect(window.albumView.title == "T")
+}
+
+@MainActor @Test func overlayCoversOnlyTheBottomAndGrowsWithTheText() {
+    let short = AlbumView(image: whiteImage(), artist: "Artist", title: "Title")
+    let long = AlbumView(image: whiteImage(), artist: "Godspeed You! Black Emperor", title: "Lift Your Skinny Fists Like Antennas to Heaven!")
+    for view in [short, long] {
+        view.frame = CGRect(x: 0, y: 0, width: 160, height: 160)
+        view.mouseEntered(with: enterExit(.mouseEntered))
+        #expect(topAndBottomBrightness(of: view).top > 0.95)
+        #expect(topAndBottomBrightness(of: view).bottom < 0.5)
+    }
+    #expect(bandHeight(of: long) > bandHeight(of: short))
+}
+
+@MainActor @Test func titleFontIsItalic() {
+    #expect(AlbumView.titleFont.fontDescriptor.symbolicTraits.contains(.italic))
+    #expect(!AlbumView.artistFont.fontDescriptor.symbolicTraits.contains(.italic))
 }
