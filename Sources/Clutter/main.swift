@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             coverSize: CoverSize.saved(in: .standard),
             showsInfoOnHover: HoverInfo.isEnabled(in: .standard)
         )
+        controller.onRemoveAlbum = { [weak self] album in self?.removeFromLibrary(album) }
         controller.showWindows()
         self.controller = controller
         let sync = LibrarySync(library: spotifyLibrary, artwork: artwork, controller: controller, albumCount: { AlbumCount.saved(in: .standard) })
@@ -64,6 +65,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             menuItem.state = menuItem.representedObject as? String == controller?.coverSize.rawValue ? .on : .off
         }
         return true
+    }
+
+    /// Removes an album whose cover was just closed from the Spotify library, then refreshes so
+    /// the next-newest album takes its place. If removing fails, the refresh brings the cover back.
+    private func removeFromLibrary(_ album: Album) {
+        Task {
+            do {
+                try await spotifyLibrary.remove(albumURI: album.spotifyURI)
+            } catch {
+                NSLog("Clutter: couldn't remove %@ from the library: %@", album.title, String(describing: error))
+                NSSound.beep()
+            }
+            controller?.finishRemoving(spotifyURI: album.spotifyURI)
+            sync?.refresh()
+        }
     }
 
     /// Saves the playing album to the Spotify library (re-saving it if it's already there, so it

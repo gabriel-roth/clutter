@@ -42,6 +42,10 @@ public struct Library: Codable, Equatable, Sendable {
         }
     }
 
+    public mutating func remove(spotifyURI: String) {
+        entries.removeAll { $0.album.spotifyURI == spotifyURI }
+    }
+
     public mutating func bringToFront(spotifyURI: String) {
         guard let index = entries.firstIndex(where: { $0.album.spotifyURI == spotifyURI }) else { return }
         entries.append(entries.remove(at: index))

@@ -249,3 +249,30 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     controller.setShowsInfoOnHover(false)
     #expect(controller.windows.allSatisfy { !$0.albumView.showsInfoOnHover })
 }
+
+@MainActor @Test func removingACoverClosesItSavesTheLibraryAndReportsTheAlbum() {
+    let store = makeStore()
+    store.save(Library(entries: [a, b].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
+    let controller = makeController(store: store)
+    controller.showWindows()
+    var removed: [Album] = []
+    controller.onRemoveAlbum = { removed.append($0) }
+    let windowA = controller.windows[0]
+    windowA.albumView.onRemove?()
+    #expect(removed == [a])
+    #expect(controller.windows.map(\.album) == [b])
+    #expect(!windowA.isVisible)
+    #expect(store.load()?.entries.map(\.album) == [b])
+}
+
+@MainActor @Test func aCoverBeingRemovedStaysOffTheDesktopUntilTheRemovalFinishes() {
+    let store = makeStore()
+    store.save(Library(entries: [a, b].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
+    let controller = makeController(store: store)
+    controller.windows[0].albumView.onRemove?()
+    controller.apply([b, a])
+    #expect(controller.windows.map(\.album) == [b])
+    controller.finishRemoving(spotifyURI: a.spotifyURI)
+    controller.apply([b, a])
+    #expect(controller.windows.map(\.album) == [b, a])
+}

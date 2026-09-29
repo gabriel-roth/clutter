@@ -153,3 +153,124 @@ private func bandHeight(of view: AlbumView) -> Int {
     #expect(AlbumView.titleFont.fontDescriptor.symbolicTraits.contains(.italic))
     #expect(!AlbumView.artistFont.fontDescriptor.symbolicTraits.contains(.italic))
 }
+
+/// A cover whose modifier keys are read from `keys` instead of the keyboard.
+@MainActor
+private func coverWithKeys(_ keys: Box<NSEvent.ModifierFlags>) -> AlbumView {
+    let view = AlbumView(image: whiteImage(), artist: "Artist", title: "Title")
+    view.frame = CGRect(x: 0, y: 0, width: 160, height: 160)
+    view.modifierFlags = { keys.value }
+    return view
+}
+
+@MainActor
+private func mouseDown(at point: CGPoint, clickCount: Int = 1) -> NSEvent {
+    NSEvent.mouseEvent(
+        with: .leftMouseDown, location: point, modifierFlags: [], timestamp: 0,
+        windowNumber: 0, context: nil, eventNumber: 0, clickCount: clickCount, pressure: 1
+    )!
+}
+
+@MainActor @Test func holdingOptionWhileHoveringShowsTheCloseButtonUntilOptionIsReleased() {
+    let keys = Box<NSEvent.ModifierFlags>([])
+    let view = coverWithKeys(keys)
+    view.mouseEntered(with: enterExit(.mouseEntered))
+    #expect(!view.isShowingCloseButton)
+    keys.value = [.option]
+    view.updateModifierKeys()
+    #expect(view.isShowingCloseButton)
+    keys.value = []
+    view.updateModifierKeys()
+    #expect(!view.isShowingCloseButton)
+}
+
+@MainActor @Test func optionAlreadyHeldShowsTheCloseButtonOnEntering() {
+    let keys = Box<NSEvent.ModifierFlags>([.option])
+    let view = coverWithKeys(keys)
+    view.mouseEntered(with: enterExit(.mouseEntered))
+    #expect(view.isShowingCloseButton)
+    view.mouseExited(with: enterExit(.mouseExited))
+    #expect(!view.isShowingCloseButton)
+}
+
+@MainActor @Test func optionWithoutHoveringShowsNoCloseButton() {
+    let keys = Box<NSEvent.ModifierFlags>([.option])
+    let view = coverWithKeys(keys)
+    view.updateModifierKeys()
+    #expect(!view.isShowingCloseButton)
+}
+
+@MainActor @Test func clickingTheCloseButtonAsksForConfirmationThatOutlastsOptionAndTheMouse() {
+    let keys = Box<NSEvent.ModifierFlags>([.option])
+    let view = coverWithKeys(keys)
+    var dragsOrClicks = 0
+    view.onMouseDown = { dragsOrClicks += 1 }
+    view.mouseEntered(with: enterExit(.mouseEntered))
+    view.mouseDown(with: mouseDown(at: CGPoint(x: view.closeButtonRect.midX, y: view.closeButtonRect.midY)))
+    #expect(view.isConfirmingRemoval)
+    #expect(dragsOrClicks == 0)
+    #expect(!view.isShowingCloseButton)
+    #expect(!view.isShowingInfo)
+    #expect(!view.removeButton.isHidden && !view.cancelButton.isHidden)
+    keys.value = []
+    view.updateModifierKeys()
+    view.mouseExited(with: enterExit(.mouseExited))
+    #expect(view.isConfirmingRemoval)
+    // The whole cover is dimmed, not just the bottom.
+    #expect(topAndBottomBrightness(of: view).top < 0.5)
+}
+
+@MainActor @Test func clickingElsewhereWithOptionHeldDoesNotAskForConfirmation() {
+    let keys = Box<NSEvent.ModifierFlags>([.option])
+    let view = coverWithKeys(keys)
+    view.mouseEntered(with: enterExit(.mouseEntered))
+    view.mouseDown(with: mouseDown(at: CGPoint(x: 150, y: 10)))
+    #expect(!view.isConfirmingRemoval)
+}
+
+@MainActor @Test func theCloseButtonIsInTheTopLeftCorner() {
+    let view = coverWithKeys(Box([]))
+    #expect(view.closeButtonRect.minX < 20)
+    #expect(view.closeButtonRect.maxY > 140)
+}
+
+@MainActor @Test func cancelDismissesTheConfirmationWithoutRemoving() {
+    let view = coverWithKeys(Box([.option]))
+    var removed = 0
+    view.onRemove = { removed += 1 }
+    view.isConfirmingRemoval = true
+    view.cancelButton.performClick(nil)
+    #expect(!view.isConfirmingRemoval)
+    #expect(view.removeButton.isHidden && view.cancelButton.isHidden)
+    #expect(removed == 0)
+}
+
+@MainActor @Test func removeDismissesTheConfirmationAndRemoves() {
+    let view = coverWithKeys(Box([]))
+    var removed = 0
+    view.onRemove = { removed += 1 }
+    view.isConfirmingRemoval = true
+    view.removeButton.performClick(nil)
+    #expect(!view.isConfirmingRemoval)
+    #expect(removed == 1)
+}
+
+@MainActor @Test func doubleClickingDoesNotPlayWhileConfirming() {
+    let view = coverWithKeys(Box([]))
+    var played = 0
+    view.onDoubleClick = { played += 1 }
+    view.isConfirmingRemoval = true
+    view.mouseDown(with: mouseDown(at: CGPoint(x: 80, y: 80), clickCount: 2))
+    #expect(played == 0)
+}
+
+@MainActor @Test func confirmationButtonsFitOnASmallCoverAndTakeTheFirstClick() {
+    let view = coverWithKeys(Box([]))
+    view.isConfirmingRemoval = true
+    view.layoutSubtreeIfNeeded()
+    for button in [view.removeButton, view.cancelButton] {
+        #expect(view.bounds.contains(button.frame))
+        #expect(button.acceptsFirstMouse(for: nil))
+    }
+    #expect(!view.removeButton.frame.intersects(view.cancelButton.frame))
+}

@@ -94,3 +94,9 @@ private func counter() -> () -> CGPoint {
     library.bringToFront(spotifyURI: d.spotifyURI)
     #expect(library.entries.map(\.album) == [a])
 }
+
+@Test func removeDropsTheEntry() {
+    var library = Library(entries: [a, b, c].map { .init(album: $0, origin: .zero) })
+    library.remove(spotifyURI: b.spotifyURI)
+    #expect(library.entries.map(\.album) == [a, c])
+}

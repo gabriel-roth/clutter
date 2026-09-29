@@ -9,6 +9,10 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public private(set) var showsInfoOnHover: Bool
     /// In stacking order, back to front, matching `library.entries`.
     public private(set) var windows: [AlbumWindow] = []
+    /// Called after a cover's Remove button closes it, to take the album out of the Spotify library.
+    public var onRemoveAlbum: ((Album) -> Void)?
+    /// Albums whose covers were removed and whose removal from Spotify hasn't finished; `apply` leaves them out.
+    private var removing: Set<String> = []
 
     private let store: LibraryStore
     private let artwork: ArtworkStore
@@ -76,8 +80,9 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     /// Shows exactly `albums` (newest first): covers already shown stay where they are, neither moved
     /// nor reordered; the rest leave, and new ones appear at random spots above everything else, newest highest.
     /// A cover whose album details changed is rebuilt in place; a placeholder cover takes artwork cached since.
+    /// Albums still being removed are left out.
     public func apply(_ albums: [Album]) {
-        library.reconcile(with: albums, newOrigin: randomOrigin)
+        library.reconcile(with: albums.filter { !removing.contains($0.spotifyURI) }, newOrigin: randomOrigin)
         store.save(library)
         let old = windows
         var candidates = Dictionary(old.map { ($0.album.spotifyURI, $0) }, uniquingKeysWith: { first, _ in first })
@@ -105,6 +110,23 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         moveToFront(window)
     }
 
+    /// Closes the album's cover and keeps it off the desktop until `finishRemoving` is called.
+    public func remove(_ album: Album) {
+        removing.insert(album.spotifyURI)
+        library.remove(spotifyURI: album.spotifyURI)
+        store.save(library)
+        windows.removeAll { window in
+            guard window.album.spotifyURI == album.spotifyURI else { return false }
+            close(window)
+            return true
+        }
+    }
+
+    /// Lets `apply` show the album again, whether or not removing it from Spotify worked.
+    public func finishRemoving(spotifyURI: String) {
+        removing.remove(spotifyURI)
+    }
+
     public func windowDidMove(_ notification: Notification) {
         guard let window = notification.object as? AlbumWindow else { return }
         library.move(spotifyURI: window.album.spotifyURI, to: window.frame.origin)
@@ -130,6 +152,11 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         window.albumView.onDoubleClick = { [player] in player.play(album) }
         window.albumView.onMouseDown = { [weak self, weak window] in
             if let self, let window { self.moveToFront(window) }
+        }
+        window.albumView.onRemove = { [weak self] in
+            guard let self else { return }
+            self.remove(album)
+            self.onRemoveAlbum?(album)
         }
         window.delegate = self
         return window
