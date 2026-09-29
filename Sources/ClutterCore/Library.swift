@@ -24,18 +24,6 @@ public struct Library: Codable, Equatable, Sendable {
         entries.contains { $0.album.spotifyURI == spotifyURI }
     }
 
-    /// Returns false, changing nothing, if the album is already in the library.
-    @discardableResult
-    public mutating func add(_ album: Album, at origin: CGPoint) -> Bool {
-        guard !contains(spotifyURI: album.spotifyURI) else { return false }
-        entries.append(Entry(album: album, origin: origin))
-        return true
-    }
-
-    public mutating func remove(spotifyURI: String) {
-        entries.removeAll { $0.album.spotifyURI == spotifyURI }
-    }
-
     public mutating func move(spotifyURI: String, to origin: CGPoint) {
         guard let index = entries.firstIndex(where: { $0.album.spotifyURI == spotifyURI }) else { return }
         entries[index].origin = origin

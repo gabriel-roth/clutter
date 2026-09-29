@@ -22,40 +22,42 @@ private func coverFrame(at origin: CGPoint, size: CoverSize = .medium) -> CGRect
     CGRect(origin: origin, size: CGSize(width: size.points, height: size.points))
 }
 
-private let custom = Album(title: "Custom", artist: "Someone", spotifyURI: "spotify:album:custom1", artworkName: "custom1")
+private func album(_ id: String, title: String? = nil) -> Album {
+    Album(title: title ?? "Title \(id)", artist: "Artist", spotifyURI: "spotify:album:\(id)", artworkName: id)
+}
+private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
 
-@MainActor @Test func firstLaunchScattersTheStarterAlbumsAndSavesThem() {
-    let store = makeStore()
-    let controller = makeController(store: store)
-    #expect(controller.windows.map(\.album) == Album.starters)
-    for window in controller.windows {
-        #expect(screen.contains(window.frame), "\(window.frame) is off screen")
-    }
-    #expect(Set(controller.windows.map(\.frame.origin.x)).count == 6)
-    #expect(store.load() == controller.library)
+@MainActor
+private func becomeKey(_ window: NSWindow, in controller: ClutterController) {
+    controller.windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification, object: window))
 }
 
-@MainActor @Test func unreadableLibraryFallsBackToStarters() throws {
+@MainActor @Test func firstLaunchStartsEmpty() {
+    let store = makeStore()
+    #expect(makeController(store: store).windows.isEmpty)
+}
+
+@MainActor @Test func unreadableLibraryStartsEmpty() throws {
     let store = makeStore()
     try FileManager.default.createDirectory(at: store.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
     try Data("garbage".utf8).write(to: store.fileURL)
-    #expect(makeController(store: store).windows.map(\.album) == Album.starters)
+    #expect(makeController(store: store).windows.isEmpty)
 }
 
-@MainActor @Test func restoresASavedLibraryWithItsPositions() {
+@MainActor @Test func restoresASavedLibraryWithItsPositionsAndStackingOrder() {
     let store = makeStore()
     store.save(Library(entries: [
-        .init(album: Album.starters[4], origin: CGPoint(x: 100, y: 300)),
-        .init(album: custom, origin: CGPoint(x: 700, y: 200)),
+        .init(album: b, origin: CGPoint(x: 100, y: 300)),
+        .init(album: a, origin: CGPoint(x: 700, y: 200)),
     ]))
     let controller = makeController(store: store)
-    #expect(controller.windows.map(\.album) == [Album.starters[4], custom])
+    #expect(controller.windows.map(\.album) == [b, a])
     #expect(controller.windows.map(\.frame) == [coverFrame(at: CGPoint(x: 100, y: 300)), coverFrame(at: CGPoint(x: 700, y: 200))])
 }
 
 @MainActor @Test func rePlacesCoversThatAreOffScreen() {
     let store = makeStore()
-    store.save(Library(entries: [.init(album: custom, origin: CGPoint(x: 5000, y: 5000))]))
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 5000, y: 5000))]))
     let controller = makeController(store: store)
     #expect(screen.contains(controller.windows[0].frame))
     #expect(store.load()?.entries[0].origin == controller.windows[0].frame.origin)
@@ -63,92 +65,122 @@ private let custom = Album(title: "Custom", artist: "Someone", spotifyURI: "spot
 
 @MainActor @Test func movingAWindowSavesItsPosition() {
     let store = makeStore()
+    store.save(Library(entries: [a, b, c].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
     let controller = makeController(store: store)
     controller.windows[2].setFrameOrigin(CGPoint(x: 321, y: 432))
     #expect(store.load()?.entries[2].origin == CGPoint(x: 321, y: 432))
 }
 
-@MainActor @Test func closingACoverRemovesItsAlbum() {
-    let store = makeStore()
-    let controller = makeController(store: store)
-    let window = controller.windows[1]
-    window.albumView.onClose?()
-    #expect(!controller.windows.contains { $0 === window })
-    #expect(!window.isVisible)
-    #expect(store.load()?.contains(spotifyURI: Album.starters[1].spotifyURI) == false)
-    #expect(store.load()?.entries.count == 5)
-}
-
-@MainActor @Test func removingEveryAlbumStaysEmptyAfterRelaunch() {
-    let store = makeStore()
-    let controller = makeController(store: store)
-    for window in controller.windows { window.albumView.onClose?() }
-    #expect(makeController(store: store).windows.isEmpty)
-}
-
 @MainActor @Test func doubleClickingAWindowPlaysItsAlbum() {
     let player = SpyPlayer()
-    let controller = makeController(store: makeStore(), player: player)
-    controller.windows[3].albumView.onDoubleClick?()
-    #expect(player.played == [Album.starters[3]])
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 100, y: 100))]))
+    let controller = makeController(store: store, player: player)
+    controller.windows[0].albumView.onDoubleClick?()
+    #expect(player.played == [a])
 }
 
 @MainActor @Test func windowsShowSavedArtwork() throws {
     let store = makeStore()
-    store.save(Library(entries: [.init(album: custom, origin: CGPoint(x: 100, y: 100))]))
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 100, y: 100))]))
     let artwork = ArtworkStore(directory: temporaryDirectory())
-    try artwork.save(jpegData(), for: custom)
-    let controller = makeController(store: store, artwork: artwork)
-    #expect(controller.windows[0].albumView.image != nil)
+    try artwork.save(jpegData(), for: a)
+    #expect(makeController(store: store, artwork: artwork).windows[0].albumView.image != nil)
 }
 
-@MainActor @Test func addingANewAlbumShowsAndSavesIt() {
+@MainActor @Test func applyShowsNewAlbumsOnScreenWithTheNewestFrontmost() {
     let store = makeStore()
     let controller = makeController(store: store)
-    #expect(controller.add(custom))
-    #expect(controller.windows.last?.album == custom)
-    #expect(screen.contains(controller.windows.last!.frame))
-    #expect(store.load()?.contains(spotifyURI: custom.spotifyURI) == true)
+    controller.apply([c, b, a])
+    #expect(controller.windows.map(\.album) == [a, b, c])
+    let allVisible = controller.windows.allSatisfy { $0.isVisible }
+    #expect(allVisible)
+    for window in controller.windows {
+        #expect(screen.contains(window.frame), "\(window.frame) is off screen")
+    }
+    #expect(store.load() == controller.library)
 }
 
-@MainActor @Test func addingAnAlbumAlreadyShownChangesNothing() {
+@MainActor @Test func applyKeepsSurvivingCoversAndStacksNewOnesOnTop() {
     let store = makeStore()
+    store.save(Library(entries: [
+        .init(album: a, origin: CGPoint(x: 100, y: 300)),
+        .init(album: b, origin: CGPoint(x: 700, y: 200)),
+    ]))
     let controller = makeController(store: store)
-    #expect(!controller.add(Album.starters[0]))
-    #expect(controller.windows.count == 6)
-    #expect(store.load()?.entries.count == 6)
+    let (windowA, windowB) = (controller.windows[0], controller.windows[1])
+    controller.apply([d, b, a])
+    #expect(controller.windows.map(\.album) == [a, b, d])
+    #expect(controller.windows[0] === windowA)
+    #expect(controller.windows[1] === windowB)
+    #expect(windowA.frame == coverFrame(at: CGPoint(x: 100, y: 300)))
+    #expect(windowB.frame == coverFrame(at: CGPoint(x: 700, y: 200)))
+    #expect(store.load()?.entries.map(\.album) == [a, b, d])
 }
 
-@MainActor @Test func closedCoverWindowIsKeptAliveUntilTheCurrentEventFinishes() async {
-    let controller = makeController(store: makeStore())
-    let window = controller.windows[0]
-    window.albumView.onClose?()
-    // The close button's action is still running when this returns, so its window must not be released yet.
-    #expect(controller.closingWindows == [window])
-    try? await Task.sleep(for: .milliseconds(50))
-    #expect(controller.closingWindows.isEmpty)
+@MainActor @Test func applyClosesCoversWhoseAlbumsLeft() {
+    let store = makeStore()
+    store.save(Library(entries: [a, b].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
+    let controller = makeController(store: store)
+    controller.showWindows()
+    let windowA = controller.windows[0]
+    controller.apply([b])
+    #expect(controller.windows.map(\.album) == [b])
+    #expect(!windowA.isVisible)
+    #expect(store.load()?.entries.map(\.album) == [b])
+}
+
+@MainActor @Test func applyWithNoAlbumsEmptiesTheDesktop() {
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 100, y: 100))]))
+    let controller = makeController(store: store)
+    controller.apply([])
+    #expect(controller.windows.isEmpty)
+    #expect(store.load() == Library())
+}
+
+@MainActor @Test func applyRebuildsACoverWhoseDetailsChangedInPlace() {
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 100, y: 300))]))
+    let controller = makeController(store: store)
+    let renamed = album("a", title: "Renamed")
+    controller.apply([renamed])
+    #expect(controller.windows.map(\.album) == [renamed])
+    #expect(controller.windows[0].frame == coverFrame(at: CGPoint(x: 100, y: 300)))
+}
+
+@MainActor @Test func clickingACoverBringsItToTheFrontAndSavesTheOrder() {
+    let store = makeStore()
+    store.save(Library(entries: [a, b, c].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
+    let controller = makeController(store: store)
+    becomeKey(controller.windows[0], in: controller)
+    #expect(controller.windows.map(\.album) == [b, c, a])
+    #expect(store.load()?.entries.map(\.album) == [b, c, a])
+}
+
+@MainActor @Test func bringToFrontMovesThatCoverToTheTop() {
+    let store = makeStore()
+    store.save(Library(entries: [a, b, c].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
+    let controller = makeController(store: store)
+    controller.bringToFront(spotifyURI: b.spotifyURI)
+    #expect(controller.windows.map(\.album) == [a, c, b])
+    #expect(store.load()?.entries.map(\.album) == [a, c, b])
+    controller.bringToFront(spotifyURI: d.spotifyURI)
+    #expect(controller.windows.map(\.album) == [a, c, b])
 }
 
 @MainActor @Test func coversOpenAtTheChosenSize() {
     let store = makeStore()
-    store.save(Library(entries: [.init(album: custom, origin: CGPoint(x: 100, y: 300))]))
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 100, y: 300))]))
     let controller = makeController(store: store, coverSize: .large)
     #expect(controller.windows[0].frame == coverFrame(at: CGPoint(x: 100, y: 300), size: .large))
-}
-
-@MainActor @Test func firstLaunchKeepsLargeCoversOnScreen() {
-    let controller = makeController(store: makeStore(), coverSize: .large)
-    for window in controller.windows {
-        #expect(window.frame.size == CGSize(width: 300, height: 300))
-        #expect(screen.contains(window.frame), "\(window.frame) is off screen")
-    }
 }
 
 @MainActor @Test func changingTheSizeResizesCoversInPlaceFromTheTopLeft() {
     let store = makeStore()
     store.save(Library(entries: [
-        .init(album: custom, origin: CGPoint(x: 100, y: 300)),
-        .init(album: Album.starters[0], origin: CGPoint(x: 700, y: 200)),
+        .init(album: a, origin: CGPoint(x: 100, y: 300)),
+        .init(album: b, origin: CGPoint(x: 700, y: 200)),
     ]))
     let controller = makeController(store: store)
     controller.setCoverSize(.small)
@@ -161,10 +193,12 @@ private let custom = Album(title: "Custom", artist: "Someone", spotifyURI: "spot
     #expect(controller.coverSize == .small)
 }
 
-@MainActor @Test func coversAddedAfterAResizeUseTheNewSize() {
+@MainActor @Test func coversAddedAfterAResizeUseTheNewSizeAndStayOnScreen() {
     let controller = makeController(store: makeStore())
     controller.setCoverSize(.large)
-    controller.add(custom)
-    #expect(controller.windows.last?.frame.size == CGSize(width: 300, height: 300))
-    #expect(screen.contains(controller.windows.last!.frame))
+    controller.apply([a, b, c])
+    for window in controller.windows {
+        #expect(window.frame.size == CGSize(width: 300, height: 300))
+        #expect(screen.contains(window.frame), "\(window.frame) is off screen")
+    }
 }

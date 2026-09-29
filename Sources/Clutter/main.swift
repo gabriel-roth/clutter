@@ -45,16 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc func addCurrentAlbum(_ sender: Any?) {
-        Task {
-            do {
-                let (album, artworkData) = try await CurrentAlbumFetcher.live.fetch()
-                try artwork.save(artworkData, for: album)
-                controller?.add(album)
-            } catch {
-                NSLog("Clutter: couldn't add the current album: %@", String(describing: error))
-                NSSound.beep()
-            }
-        }
+        // Replaced in the LibrarySync task.
+        NSSound.beep()
     }
 }
 

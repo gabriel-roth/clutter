@@ -1,15 +1,13 @@
 import AppKit
 
-/// Shows a window for each album in the library and keeps the saved library in step
-/// as covers are moved, closed, and added.
+/// Shows a window for each album in the library, stacked in the library's order, and keeps the
+/// saved library in step as covers are moved, clicked to the front, and replaced by `apply`.
 @MainActor
 public final class ClutterController: NSObject, NSWindowDelegate {
     public private(set) var library: Library
     public private(set) var coverSize: CoverSize
+    /// In stacking order, back to front, matching `library.entries`.
     public private(set) var windows: [AlbumWindow] = []
-    /// Closed windows kept alive until the current event finishes: a cover is closed from its own
-    /// close button's action, which must not find its window (and button) freed underneath it.
-    private(set) var closingWindows: [AlbumWindow] = []
 
     private let store: LibraryStore
     private let artwork: ArtworkStore
@@ -35,14 +33,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         self.library = Library()
         super.init()
 
-        let saved = store.load()
-        var library = saved ?? Library()
-        var changed = saved == nil
-        if saved == nil {
-            for album in Album.starters {
-                library.add(album, at: randomOrigin())
-            }
-        }
+        var library = store.load() ?? Library()
+        var changed = false
         for entry in library.entries where !Placement.isVisible(frame(at: entry.origin), on: screens) {
             library.move(spotifyURI: entry.album.spotifyURI, to: randomOrigin())
             changed = true
@@ -52,8 +44,9 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         windows = library.entries.map(makeWindow(for:))
     }
 
+    /// Orders every cover front in stacking order, so the last is frontmost.
     public func showWindows() {
-        windows.forEach { $0.orderFront(nil) }
+        windows.forEach { $0.orderFrontRegardless() }
     }
 
     /// Resizes every cover to `size`, keeping each one's top-left corner where it is.
@@ -68,21 +61,29 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         store.save(library)
     }
 
-    /// Shows a new cover for `album` at a random spot. If it's already shown, brings that cover
-    /// to the front instead and returns false.
-    @discardableResult
-    public func add(_ album: Album) -> Bool {
-        if let existing = windows.first(where: { $0.album.spotifyURI == album.spotifyURI }) {
-            existing.orderFrontRegardless()
-            return false
-        }
-        let entry = Library.Entry(album: album, origin: randomOrigin())
-        library.add(album, at: entry.origin)
+    /// Shows exactly `albums` (newest first): covers already shown stay where they are, the rest
+    /// leave, and new ones appear at random spots above everything else, newest highest.
+    /// A cover whose album details changed is rebuilt in place.
+    public func apply(_ albums: [Album]) {
+        library.reconcile(with: albums, newOrigin: randomOrigin)
         store.save(library)
-        let window = makeWindow(for: entry)
-        windows.append(window)
+        var unused = Dictionary(uniqueKeysWithValues: windows.map { ($0.album.spotifyURI, $0) })
+        windows = library.entries.map { entry in
+            if let window = unused[entry.album.spotifyURI], window.album == entry.album {
+                unused[entry.album.spotifyURI] = nil
+                return window
+            }
+            return makeWindow(for: entry)
+        }
+        unused.values.forEach(close)
+        showWindows()
+    }
+
+    /// Brings the album's cover to the front, if it's shown.
+    public func bringToFront(spotifyURI: String) {
+        guard let window = windows.first(where: { $0.album.spotifyURI == spotifyURI }) else { return }
         window.orderFrontRegardless()
-        return true
+        moveToFront(window)
     }
 
     public func windowDidMove(_ notification: Notification) {
@@ -91,22 +92,28 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         store.save(library)
     }
 
-    private func remove(_ album: Album) {
-        library.remove(spotifyURI: album.spotifyURI)
+    /// A clicked cover comes to the front; remember that.
+    public func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? AlbumWindow else { return }
+        moveToFront(window)
+    }
+
+    private func moveToFront(_ window: AlbumWindow) {
+        guard let index = windows.firstIndex(where: { $0 === window }), index != windows.count - 1 else { return }
+        windows.append(windows.remove(at: index))
+        library.bringToFront(spotifyURI: window.album.spotifyURI)
         store.save(library)
-        guard let index = windows.firstIndex(where: { $0.album.spotifyURI == album.spotifyURI }) else { return }
-        let window = windows.remove(at: index)
+    }
+
+    private func close(_ window: AlbumWindow) {
         window.delegate = nil
         window.close()
-        closingWindows.append(window)
-        Task { @MainActor [weak self] in self?.closingWindows.removeAll() }
     }
 
     private func makeWindow(for entry: Library.Entry) -> AlbumWindow {
         let album = entry.album
         let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: frame(at: entry.origin))
         window.albumView.onDoubleClick = { [player] in player.play(album) }
-        window.albumView.onClose = { [weak self] in self?.remove(album) }
         window.delegate = self
         return window
     }
