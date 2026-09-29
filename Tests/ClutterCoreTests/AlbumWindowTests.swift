@@ -44,3 +44,8 @@ private func mouseDown(clickCount: Int) -> NSEvent {
     #expect(window.contentView === window.albumView)
     #expect(window.album == Album.all[0])
 }
+
+@MainActor @Test func firstClickOnAnInactiveCoverIsHandled() {
+    // Otherwise the first click only activates the window, so dragging needs two tries.
+    #expect(AlbumView(image: nil).acceptsFirstMouse(for: mouseDown(clickCount: 1)))
+}

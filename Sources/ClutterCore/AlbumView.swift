@@ -26,6 +26,8 @@ public final class AlbumView: NSView {
         image.draw(in: NSRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2, width: width, height: height))
     }
 
+    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     public override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
             onDoubleClick?()
