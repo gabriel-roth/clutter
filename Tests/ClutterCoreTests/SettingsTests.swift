@@ -3,6 +3,7 @@ import KeyboardShortcuts
 import Testing
 @testable import ClutterCore
 
+@MainActor
 private func allSubviews(of view: NSView?) -> [NSView] {
     guard let view else { return [] }
     return view.subviews + view.subviews.flatMap { allSubviews(of: $0) }
