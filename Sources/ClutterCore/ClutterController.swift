@@ -11,6 +11,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public private(set) var windows: [AlbumWindow] = []
     /// Called after a cover's Remove button closes it, to take the album out of the Spotify library.
     public var onRemoveAlbum: ((Album) -> Void)?
+    /// Whether the covers are hidden from the desktop; while they are, nothing orders a cover front.
+    public private(set) var isHidden = false
     /// Albums whose covers were removed and whose removal from Spotify hasn't finished; `apply` leaves them out.
     private var removing: Set<String> = []
 
@@ -56,7 +58,22 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     /// Orders every cover front in stacking order, so the last is frontmost.
     public func showWindows() {
-        windows.forEach { $0.orderFrontRegardless() }
+        windows.forEach(orderFront)
+    }
+
+    /// Hides or shows every cover. Covers added while hidden appear when they're shown again.
+    public func setHidden(_ hidden: Bool) {
+        guard hidden != isHidden else { return }
+        isHidden = hidden
+        if hidden {
+            windows.forEach { $0.orderOut(nil) }
+        } else {
+            showWindows()
+        }
+    }
+
+    private func orderFront(_ window: AlbumWindow) {
+        if !isHidden { window.orderFrontRegardless() }
     }
 
     /// Resizes every cover to `size`, keeping each one's top-left corner where it is.
@@ -100,12 +117,13 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         }
         old.filter { !reused.contains(ObjectIdentifier($0)) }.forEach(close)
         // Only new covers come forward; the rest stay wherever they are among other apps' windows.
-        windows.filter { !reused.contains(ObjectIdentifier($0)) }.forEach { $0.orderFrontRegardless() }
+        windows.filter { !reused.contains(ObjectIdentifier($0)) }.forEach(orderFront)
     }
 
-    /// Brings the album's cover to the front, if it's shown.
+    /// Brings the album's cover to the front, showing the covers first if they were hidden.
     public func bringToFront(spotifyURI: String) {
         guard let window = windows.first(where: { $0.album.spotifyURI == spotifyURI }) else { return }
+        setHidden(false)
         window.orderFrontRegardless()
         moveToFront(window)
     }

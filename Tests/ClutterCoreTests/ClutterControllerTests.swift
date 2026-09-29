@@ -276,3 +276,32 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     controller.apply([b, a])
     #expect(controller.windows.map(\.album) == [b, a])
 }
+
+@MainActor @Test func hidingTakesEveryCoverOffTheDesktopAndShowingBringsThemBack() {
+    let controller = makeController(store: makeStore())
+    controller.apply([a, b])
+    controller.setHidden(true)
+    #expect(controller.isHidden)
+    #expect(controller.windows.allSatisfy { !$0.isVisible })
+    controller.setHidden(false)
+    #expect(!controller.isHidden)
+    #expect(controller.windows.allSatisfy { $0.isVisible })
+}
+
+@MainActor @Test func coversAppliedWhileHiddenStayHiddenUntilShown() {
+    let controller = makeController(store: makeStore())
+    controller.setHidden(true)
+    controller.apply([a])
+    #expect(!controller.windows[0].isVisible)
+    controller.setHidden(false)
+    #expect(controller.windows[0].isVisible)
+}
+
+@MainActor @Test func bringingACoverToTheFrontShowsHiddenCovers() {
+    let controller = makeController(store: makeStore())
+    controller.apply([a, b])
+    controller.setHidden(true)
+    controller.bringToFront(spotifyURI: a.spotifyURI)
+    #expect(!controller.isHidden)
+    #expect(controller.windows.allSatisfy { $0.isVisible })
+}

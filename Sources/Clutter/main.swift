@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var closeAboutOnCommandW: Any?
     private var sync: LibrarySync?
     private var statusItem: NSStatusItem?
+    private var statusMenu: NSMenu?
     private lazy var settings = SettingsWindowController(
         albumCount: AlbumCount.saved(in: .standard),
         showsInfoOnHover: HoverInfo.isEnabled(in: .standard),
@@ -53,11 +54,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
+    /// A plain click shows or hides the covers; Command-click opens `menu`.
     func installStatusItem(menu: NSMenu) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "square.stack", accessibilityDescription: "Clutter")
-        item.menu = menu
+        item.button?.target = self
+        item.button?.action = #selector(statusItemClicked(_:))
+        statusMenu = menu
         statusItem = item
+    }
+
+    @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
+        guard let controller, let statusItem else { return }
+        if NSApp.currentEvent?.modifierFlags.contains(.command) == true, let menu = statusMenu {
+            // Attaching the menu only for this click keeps plain clicks routed to the action.
+            statusItem.menu = menu
+            sender.performClick(nil)
+            statusItem.menu = nil
+        } else {
+            controller.setHidden(!controller.isHidden)
+        }
     }
 
     @objc func showAbout(_ sender: Any?) {
@@ -196,17 +212,12 @@ mainMenu.addItem(viewMenuItem)
 
 app.mainMenu = mainMenu
 
-// Clutter lives in the menu bar, not the Dock. The same commands are in the status item's menu.
+// Clutter lives in the menu bar, not the Dock. Clicking the icon shows or hides the covers; Command-click opens this menu.
 let statusMenu = NSMenu()
-for (title, action, key) in [
-    ("Add Currently Playing Album", #selector(AppDelegate.addCurrentAlbum(_:)), ""),
-    ("Settings…", #selector(AppDelegate.showSettings(_:)), ","),
-] {
-    let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-    item.target = delegate
-    if action == #selector(AppDelegate.addCurrentAlbum(_:)) { item.setShortcut(for: .addCurrentAlbum) }
-    statusMenu.addItem(item)
-}
+let statusAddItem = NSMenuItem(title: "Add Currently Playing Album", action: #selector(AppDelegate.addCurrentAlbum(_:)), keyEquivalent: "")
+statusAddItem.target = delegate
+statusAddItem.setShortcut(for: .addCurrentAlbum)
+statusMenu.addItem(statusAddItem)
 let sizeMenu = NSMenu(title: "Cover Size")
 for size in CoverSize.allCases {
     let item = NSMenuItem(title: size.title, action: #selector(AppDelegate.setCoverSize(_:)), keyEquivalent: "")
@@ -217,6 +228,9 @@ for size in CoverSize.allCases {
 let sizeMenuItem = NSMenuItem(title: "Cover Size", action: nil, keyEquivalent: "")
 sizeMenuItem.submenu = sizeMenu
 statusMenu.addItem(sizeMenuItem)
+let statusSettingsItem = NSMenuItem(title: "Settings…", action: #selector(AppDelegate.showSettings(_:)), keyEquivalent: ",")
+statusSettingsItem.target = delegate
+statusMenu.addItem(statusSettingsItem)
 statusMenu.addItem(.separator())
 let statusAboutItem = NSMenuItem(title: "About Clutter", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
 statusAboutItem.target = delegate
