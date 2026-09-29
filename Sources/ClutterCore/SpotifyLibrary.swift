@@ -22,6 +22,13 @@ public enum SpotifyLibraryError: Error, Equatable {
     case removedButNotSaved(albumURI: String)
 }
 
+/// Whether the library differs from the version an ETag names.
+public enum LibraryCheck: Equatable, Sendable {
+    case unchanged
+    /// `etag` names the current version, for the next check. Nil if Spotify didn't send one.
+    case changed(etag: String?)
+}
+
 /// Reads and edits the albums saved in the user's Spotify library through the Web API.
 public struct SpotifyLibrary: Sendable {
     public typealias HTTP = @Sendable (URLRequest) async throws -> (Data, URLResponse)
@@ -65,6 +72,20 @@ public struct SpotifyLibrary: Sendable {
         }
         // Spotify doesn't document the order, so don't rely on it.
         return albums.sorted { $0.addedAt > $1.addedAt }
+    }
+
+    /// Asks for the newest saved album, conditional on `etag`, the ETag an earlier check returned.
+    /// Spotify answers 304 when that page hasn't changed, which costs no body.
+    public func checkForChanges(since etag: String?) async throws -> LibraryCheck {
+        let (_, response) = try await request(
+            "GET", "me/albums", query: [("limit", "1")],
+            headers: etag.map { ["If-None-Match": $0] } ?? [:],
+            // URLSession's cache would otherwise answer a 304 with its stored copy as a 200.
+            cachePolicy: .reloadIgnoringLocalCacheData,
+            accepting: 304
+        )
+        if response.statusCode == 304 { return .unchanged }
+        return .changed(etag: response.value(forHTTPHeaderField: "ETag"))
     }
 
     public func contains(albumURI: String) async throws -> Bool {
@@ -112,24 +133,38 @@ public struct SpotifyLibrary: Sendable {
     }
 
     private func send(_ method: String, _ path: String, query: [(String, String)]) async throws -> Data {
+        try await request(method, path, query: query).data
+    }
+
+    /// Throws for any status outside 200–299 other than `accepting`.
+    private func request(
+        _ method: String, _ path: String, query: [(String, String)],
+        headers: [String: String] = [:],
+        cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy,
+        accepting acceptedStatus: Int? = nil
+    ) async throws -> (data: Data, response: HTTPURLResponse) {
         var components = URLComponents(url: Self.apiBase.appending(path: path), resolvingAgainstBaseURL: false)!
         components.percentEncodedQuery = query.map { "\($0)=\(Self.percentEncoded($1))" }.joined(separator: "&")
-        var request = URLRequest(url: components.url!)
+        var request = URLRequest(url: components.url!, cachePolicy: cachePolicy)
         request.httpMethod = method
+        for (field, value) in headers {
+            request.setValue(value, forHTTPHeaderField: field)
+        }
         if method == "PUT" {
             request.httpBody = Data()  // Sends Content-Length: 0.
         }
         let token = try await accessToken()
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await http(request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200..<300).contains(status) else {
-            let retryAfter = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Retry-After")
+        let httpResponse = response as? HTTPURLResponse
+        let status = httpResponse?.statusCode ?? 0
+        guard let httpResponse, (200..<300).contains(status) || status == acceptedStatus else {
+            let retryAfter = httpResponse?.value(forHTTPHeaderField: "Retry-After")
                 .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
                 .flatMap { $0 >= 0 ? $0 : nil }
             throw SpotifyLibraryError.requestFailed(status: status, body: String(decoding: data, as: UTF8.self), retryAfter: retryAfter)
         }
-        return data
+        return (data, httpResponse)
     }
 
     static func percentEncoded(_ value: String) -> String {

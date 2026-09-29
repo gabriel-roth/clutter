@@ -38,8 +38,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let sync = LibrarySync(library: spotifyLibrary, artwork: artwork, controller: controller, albumCount: { AlbumCount.saved(in: .standard) })
         self.sync = sync
         Task {
+            // The first check comes right away, so it also does the launch refresh.
             if await spotifySignIn.promptIfSignedOut() {
-                sync.refresh()
+                sync.startPolling(every: .seconds(30))
             }
         }
         KeyboardShortcuts.onKeyUp(for: .addCurrentAlbum) { [weak self] in

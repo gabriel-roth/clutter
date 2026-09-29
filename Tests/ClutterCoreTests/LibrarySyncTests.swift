@@ -155,3 +155,104 @@ private final class Gate: @unchecked Sendable {
     #expect(first.isCancelled)
     #expect(harness.controller.windows.map(\.album.artworkName) == ["second"])
 }
+
+private func changed(_ etag: String) -> (status: Int, body: String, headers: [String: String]) {
+    (200, page([item("x", addedAt: "2026-09-01T00:00:00Z")]), ["ETag": etag])
+}
+
+private let unchanged: (status: Int, body: String, headers: [String: String]) = (304, "", [:])
+
+@MainActor
+private func pollingSync(_ http: FakeHTTP, controller: ClutterController, artwork: ArtworkStore, sleep: @escaping @Sendable (Duration) async throws -> Void = { _ in }) -> LibrarySync {
+    LibrarySync(
+        library: SpotifyLibrary(accessToken: { "TOKEN" }, http: { try http.handle($0) }),
+        artwork: artwork,
+        controller: controller,
+        albumCount: { 10 },
+        download: { _ in jpegData() },
+        sleep: sleep
+    )
+}
+
+@MainActor @Test func aChangedLibraryIsRefreshedAndAnUnchangedOneIsNot() async {
+    let harness = Harness(replies: [])
+    let http = FakeHTTP(withHeaders: [
+        changed(#""E1""#),
+        (200, page([item("new", addedAt: "2026-09-01T00:00:00Z")]), [:]),
+        unchanged,
+    ])
+    let sync = pollingSync(http, controller: harness.controller, artwork: harness.artwork)
+    await sync.refreshIfChanged()
+    #expect(harness.controller.windows.map(\.album.artworkName) == ["new"])
+    await sync.refreshIfChanged()
+    #expect(http.recorded.map { $0.value(forHTTPHeaderField: "If-None-Match") } == [nil, nil, #""E1""#])
+    #expect(http.recorded.count == 3)
+}
+
+@MainActor @Test func aFailedRefreshIsRetriedOnTheNextCheck() async {
+    let harness = Harness(replies: [])
+    let http = FakeHTTP(withHeaders: [
+        changed(#""E1""#),
+        (500, "{}", [:]),
+        changed(#""E1""#),
+        (200, page([item("new", addedAt: "2026-09-01T00:00:00Z")]), [:]),
+    ])
+    let sync = pollingSync(http, controller: harness.controller, artwork: harness.artwork)
+    await sync.refreshIfChanged()
+    await sync.refreshIfChanged()
+    #expect(http.recorded[2].value(forHTTPHeaderField: "If-None-Match") == nil)
+    #expect(harness.controller.windows.map(\.album.artworkName) == ["new"])
+}
+
+@MainActor @Test func aFailedCheckLeavesTheDesktopAlone() async {
+    let saved = Library(entries: [.init(album: album("kept"), origin: CGPoint(x: 100, y: 100))])
+    let harness = Harness(replies: [], saved: saved)
+    let http = FakeHTTP([(429, "")])
+    await pollingSync(http, controller: harness.controller, artwork: harness.artwork).refreshIfChanged()
+    #expect(http.recorded.count == 1)
+    #expect(harness.controller.windows.map(\.album.artworkName) == ["kept"])
+}
+
+@MainActor @Test func checkingIsSkippedWhileARefreshIsRunning() async {
+    let harness = Harness(replies: [])
+    let http = FakeHTTP(withHeaders: [(200, page([item("a", addedAt: "2026-09-01T00:00:00Z")]), [:])])
+    let downloading = Gate(), release = Gate()
+    let sync = LibrarySync(
+        library: SpotifyLibrary(accessToken: { "TOKEN" }, http: { try http.handle($0) }),
+        artwork: harness.artwork,
+        controller: harness.controller,
+        albumCount: { 10 },
+        download: { _ in
+            downloading.open()
+            await release.wait()
+            return jpegData()
+        }
+    )
+    let refresh = sync.refresh()
+    await downloading.wait()
+    await sync.refreshIfChanged()
+    #expect(http.recorded.count == 1)
+    release.open()
+    await refresh.value
+    #expect(!refresh.isCancelled)
+    #expect(harness.controller.windows.map(\.album.artworkName) == ["a"])
+}
+
+@MainActor @Test func pollingChecksRightAwayThenAfterEachInterval() async {
+    let harness = Harness(replies: [])
+    let http = FakeHTTP(withHeaders: [
+        changed(#""E1""#),
+        (200, page([item("a", addedAt: "2026-09-01T00:00:00Z")]), [:]),
+        unchanged,
+        unchanged,
+    ])
+    let sleeps = Box<[Duration]>([])
+    let sync = pollingSync(http, controller: harness.controller, artwork: harness.artwork, sleep: { duration in
+        sleeps.value.append(duration)
+        if sleeps.value.count == 3 { throw CancellationError() }
+    })
+    await sync.startPolling(every: .seconds(30)).value
+    #expect(sleeps.value == [.seconds(30), .seconds(30), .seconds(30)])
+    #expect(http.recorded.count == 4)
+    #expect(harness.controller.windows.map(\.album.artworkName) == ["a"])
+}

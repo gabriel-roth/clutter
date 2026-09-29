@@ -178,3 +178,36 @@ private func page(_ items: [String], next: String? = nil) -> String {
     let http = FakeHTTP([(200, #"{"next":null}"#)])
     await #expect(throws: SpotifyLibraryError.malformedResponse) { try await makeLibrary(http).recentAlbums(count: 10) }
 }
+
+@Test func checkingForChangesAsksForOneAlbumAndBypassesTheCache() async throws {
+    let http = FakeHTTP(withHeaders: [(200, page([item("a", addedAt: "2026-09-01T00:00:00Z")]), ["ETag": #""E1""#])])
+    let check = try await makeLibrary(http).checkForChanges(since: nil)
+    let request = http.recorded[0]
+    #expect(check == .changed(etag: #""E1""#))
+    #expect(request.url?.absoluteString == "https://api.spotify.com/v1/me/albums?limit=1")
+    #expect(request.value(forHTTPHeaderField: "If-None-Match") == nil)
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer TOKEN")
+    // URLSession's cache would otherwise turn Spotify's 304 into a cached 200.
+    #expect(request.cachePolicy == .reloadIgnoringLocalCacheData)
+}
+
+@Test func checkingForChangesSendsTheETagAndReadsA304AsUnchanged() async throws {
+    let http = FakeHTTP([(304, "")])
+    let check = try await makeLibrary(http).checkForChanges(since: #""E1""#)
+    #expect(check == .unchanged)
+    #expect(http.recorded[0].value(forHTTPHeaderField: "If-None-Match") == #""E1""#)
+}
+
+@Test func checkingForChangesThrowsOnAFailedRequest() async {
+    let http = FakeHTTP([(500, "oops")])
+    await #expect(throws: SpotifyLibraryError.requestFailed(status: 500, body: "oops")) {
+        try await makeLibrary(http).checkForChanges(since: #""E1""#)
+    }
+}
+
+@Test func otherRequestsTreatA304AsAFailure() async {
+    let http = FakeHTTP([(304, "")])
+    await #expect(throws: SpotifyLibraryError.requestFailed(status: 304, body: "")) {
+        try await makeLibrary(http).recentAlbums(count: 10)
+    }
+}
