@@ -27,6 +27,7 @@ final class SpotifySignIn: NSObject, ASWebAuthenticationPresentationContextProvi
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             // The user closed the sign-in window.
         } catch {
+            NSLog("Clutter: Spotify sign-in failed: %@", String(describing: error))
             let failure = NSAlert()
             failure.messageText = "Couldn't sign in to Spotify"
             failure.informativeText = error.localizedDescription
