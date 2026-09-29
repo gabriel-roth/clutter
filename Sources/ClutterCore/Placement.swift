@@ -18,49 +18,75 @@ public enum Placement {
 }
 
 extension Placement {
-    /// Where each cover in `origins` should go to line up in a grid, in the same order: covers are
-    /// assigned to distinct cells of a grid of `size`-point cells filling the `screens`, so that
-    /// together they move as little as possible. If the screens have fewer cells than there are
-    /// covers, the grid tightens (its cells overlap) until there are enough.
+    /// Where each cover in `origins` should go to line up in an evenly spread grid, in the same order.
+    /// Each cover goes to the screen it's nearest; the covers on a screen get a grid just big enough for
+    /// them (shaped to the screen, with equal gaps between covers and equal margins around them), and
+    /// are assigned to its cells so that together they move as little as possible. If a screen can't
+    /// hold its covers without overlap, the grid's cells overlap instead.
     public static func tidyOrigins(of origins: [CGPoint], size: CGFloat, on screens: [CGRect]) -> [CGPoint] {
         guard !origins.isEmpty, !screens.isEmpty else { return origins }
-        var extra = 0
-        var cells = gridCells(size: size, on: screens, extra: extra)
-        while cells.count < origins.count {
-            extra += 1
-            cells = gridCells(size: size, on: screens, extra: extra)
+        var groups = [[Int]](repeating: [], count: screens.count)
+        for (index, origin) in origins.enumerated() {
+            let center = CGPoint(x: origin.x + size / 2, y: origin.y + size / 2)
+            let nearest = screens.indices.min { distance(from: center, to: screens[$0]) < distance(from: center, to: screens[$1]) }!
+            groups[nearest].append(index)
         }
-        let cost = origins.map { origin in
-            cells.map { cell in
-                let dx = Double(origin.x - cell.x), dy = Double(origin.y - cell.y)
-                return dx * dx + dy * dy
-            }
-        }
-        return assignment(minimizing: cost).map { cells[$0] }
-    }
-
-    /// The origins of a grid on each screen, top row first: as many `size`-point columns and rows as
-    /// fit plus `extra`, centered on the screen when they don't overlap, and pinned to its top-left
-    /// corner when the screen is smaller than a cover.
-    private static func gridCells(size: CGFloat, on screens: [CGRect], extra: Int) -> [CGPoint] {
-        screens.flatMap { screen -> [CGPoint] in
-            let columns = max(1, Int((screen.width / size).rounded(.down))) + extra
-            let rows = max(1, Int((screen.height / size).rounded(.down))) + extra
-            let spanX = screen.width - size, spanY = screen.height - size
-            let pitchX = columns > 1 ? min(size, spanX / CGFloat(columns - 1)) : 0
-            let pitchY = rows > 1 ? min(size, spanY / CGFloat(rows - 1)) : 0
-            let marginX = max(0, spanX - pitchX * CGFloat(columns - 1)) / 2
-            let marginY = max(0, spanY - pitchY * CGFloat(rows - 1)) / 2
-            return (0..<rows).flatMap { row in
-                (0..<columns).map { column in
-                    // Whole points, rounded down, as for random origins.
-                    CGPoint(
-                        x: (screen.minX + marginX + CGFloat(column) * pitchX).rounded(.down),
-                        y: (screen.maxY - marginY - size - CGFloat(row) * pitchY).rounded(.down)
-                    )
+        var result = origins
+        for (screen, indices) in zip(screens, groups) where !indices.isEmpty {
+            let cells = gridCells(count: indices.count, size: size, in: screen)
+            let cost = indices.map { index in
+                cells.map { cell in
+                    let dx = Double(origins[index].x - cell.x), dy = Double(origins[index].y - cell.y)
+                    return dx * dx + dy * dy
                 }
             }
+            for (index, cell) in zip(indices, assignment(minimizing: cost)) {
+                result[index] = cells[cell]
+            }
         }
+        return result
+    }
+
+    private static func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
+        let dx = max(rect.minX - point.x, 0, point.x - rect.maxX)
+        let dy = max(rect.minY - point.y, 0, point.y - rect.maxY)
+        return (dx * dx + dy * dy).squareRoot()
+    }
+
+    /// The origins of the cells of a grid for `count` covers on `screen`. The grid has the fewest empty
+    /// cells, then cells closest to square, among those that fit without overlap (or, if none do, among
+    /// all). Covers are spread evenly, with the same gap between them as around the edge.
+    private static func gridCells(count: Int, size: CGFloat, in screen: CGRect) -> [CGPoint] {
+        let maxColumns = max(1, Int((screen.width / size).rounded(.down)))
+        let maxRows = max(1, Int((screen.height / size).rounded(.down)))
+        var shapes = (1...maxColumns).flatMap { columns in
+            (1...maxRows).map { (columns: columns, rows: $0) }
+        }.filter { $0.columns * $0.rows >= count }
+        if shapes.isEmpty {
+            shapes = (1...count).map { (columns: $0, rows: (count + $0 - 1) / $0) }
+        }
+        func badness(_ shape: (columns: Int, rows: Int)) -> (Int, Double) {
+            let squareness = ((screen.width / CGFloat(shape.columns)) / (screen.height / CGFloat(shape.rows)))
+            return (shape.columns * shape.rows - count, abs(log(Double(squareness))))
+        }
+        let shape = shapes.min { badness($0) < badness($1) }!
+        let xs = offsets(count: shape.columns, size: size, length: screen.width).map { screen.minX + $0 }
+        // Rows count down from the top edge, since origins are at a cover's bottom-left.
+        let ys = offsets(count: shape.rows, size: size, length: screen.height).map { screen.maxY - size - $0 }
+        return ys.flatMap { y in xs.map { CGPoint(x: $0.rounded(.down), y: y.rounded(.down)) } }
+    }
+
+    /// Where `count` covers of `size` start along a `length`-long edge: evenly spread with equal gaps
+    /// between and around them, or, if they don't fit, overlapping from one end to the other. A cover on
+    /// an edge shorter than itself starts at 0.
+    private static func offsets(count: Int, size: CGFloat, length: CGFloat) -> [CGFloat] {
+        let span = max(0, length - size)
+        if count == 1 { return [span / 2] }
+        let gap = (length - CGFloat(count) * size) / CGFloat(count + 1)
+        if gap >= 0 {
+            return (0..<count).map { gap + CGFloat($0) * (size + gap) }
+        }
+        return (0..<count).map { CGFloat($0) * span / CGFloat(count - 1) }
     }
 
     /// For each row of `cost`, the column it's assigned so that no two rows share a column and the total

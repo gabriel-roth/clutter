@@ -326,19 +326,20 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     #expect(!controller.isHidden)
 }
 
-@MainActor @Test func tidyLinesCoversUpInAGridNearWhereTheyWere() {
+@MainActor @Test func tidyLinesCoversUpInAnEvenGridNearWhereTheyWere() {
     let store = makeStore()
     store.save(Library(entries: [
         .init(album: a, origin: CGPoint(x: 70, y: 40)),
-        .init(album: b, origin: CGPoint(x: 300, y: 60)),
-        .init(album: c, origin: CGPoint(x: 90, y: 400)),
+        .init(album: b, origin: CGPoint(x: 900, y: 60)),
+        .init(album: c, origin: CGPoint(x: 90, y: 600)),
+        .init(album: d, origin: CGPoint(x: 850, y: 700)),
     ]))
     let controller = makeController(store: store)
     controller.tidy()
     let origins = controller.windows.map(\.frame.origin)
-    #expect(origins == [CGPoint(x: 60, y: 132), CGPoint(x: 280, y: 132), CGPoint(x: 60, y: 352)])
+    #expect(origins == [CGPoint(x: 333, y: 170), CGPoint(x: 886, y: 170), CGPoint(x: 333, y: 535), CGPoint(x: 886, y: 535)])
     #expect(store.load()?.entries.map(\.origin) == origins)
-    #expect(controller.windows.map(\.album) == [a, b, c])
+    #expect(controller.windows.map(\.album) == [a, b, c, d])
 }
 
 @MainActor @Test func scrambleMovesCoversToNewSpotsOnScreenAndKeepsTheOrder() {

@@ -46,17 +46,24 @@ private func tidied(_ origins: [CGPoint], size: CGFloat = 220, on screens: [CGRe
     Placement.tidyOrigins(of: origins, size: size, on: screens)
 }
 
-@Test func tidyKeepsEachCoverInItsOwnCell() {
-    // 1440 wide fits 6 columns of 220 (1320, leaving 120 of margin); 875 high fits 3 rows (660, leaving 215).
-    let result = tidied([CGPoint(x: 3, y: 30), CGPoint(x: 1000, y: 700)])
-    #expect(Set(result.map(\.x)).isSubset(of: (0..<6).map { 60 + CGFloat($0) * 220 }))
-    #expect(Set(result.map(\.y)).isSubset(of: (0..<3).map { 25 + 107 + CGFloat($0) * 220 }))
-    #expect(distinctCount(result) == 2)
+@Test func tidyCentersASingleCover() {
+    #expect(tidied([CGPoint(x: 3, y: 30)]) == [CGPoint(x: 610, y: 352)])
 }
 
-@Test func tidyMovesACoverToTheNearestCell() {
-    let result = tidied([CGPoint(x: 70, y: 40)])
-    #expect(result == [CGPoint(x: 60, y: 132)])
+@Test func tidyPutsFourCoversInATwoByTwoGridNearestTheirOldSpots() {
+    let result = tidied([CGPoint(x: 70, y: 40), CGPoint(x: 900, y: 60), CGPoint(x: 90, y: 600), CGPoint(x: 850, y: 700)])
+    #expect(result == [CGPoint(x: 333, y: 170), CGPoint(x: 886, y: 170), CGPoint(x: 333, y: 535), CGPoint(x: 886, y: 535)])
+}
+
+@Test func tidySpreadsCoversWithEqualGapsAndMargins() {
+    let result = tidied(Array(repeating: CGPoint(x: 400, y: 300), count: 10)) // a five-by-two grid
+    let xs = Array(Set(result.map(\.x))).sorted()
+    let ys = Array(Set(result.map(\.y))).sorted()
+    #expect(xs.count == 5 && ys.count == 2)
+    let xGaps = [xs[0] - screen.minX] + zip(xs, xs.dropFirst()).map { $1 - $0 - 220 } + [screen.maxX - xs[4] - 220]
+    let yGaps = [ys[0] - screen.minY] + zip(ys, ys.dropFirst()).map { $1 - $0 - 220 } + [screen.maxY - ys[1] - 220]
+    #expect(xGaps.max()! - xGaps.min()! <= 1)
+    #expect(yGaps.max()! - yGaps.min()! <= 1)
 }
 
 @Test func tidyGivesEveryCoverADistinctCellEvenWhenTheyStartStacked() {
