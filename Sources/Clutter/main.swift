@@ -49,6 +49,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
+    @objc func showAbout(_ sender: Any?) {
+        let link = "https://github.com/gabriel-roth/clutter"
+        let credits = NSMutableAttributedString(
+            string: link,
+            attributes: [
+                .link: URL(string: link)!,
+                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            ]
+        )
+        credits.addAttribute(.paragraphStyle, value: {
+            let style = NSMutableParagraphStyle()
+            style.alignment = .center
+            return style
+        }(), range: NSRange(location: 0, length: credits.length))
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+        NSApp.activate()
+    }
+
     @objc func showSettings(_ sender: Any?) {
         settings.show()
     }
@@ -112,9 +130,19 @@ app.delegate = delegate
 let mainMenu = NSMenu()
 
 let appMenu = NSMenu()
+let aboutItem = NSMenuItem(title: "About Clutter", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
+aboutItem.target = delegate
+appMenu.addItem(aboutItem)
+appMenu.addItem(.separator())
 let settingsItem = NSMenuItem(title: "Settings…", action: #selector(AppDelegate.showSettings(_:)), keyEquivalent: ",")
 settingsItem.target = delegate
 appMenu.addItem(settingsItem)
+appMenu.addItem(.separator())
+appMenu.addItem(withTitle: "Hide Clutter", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+let hideOthersItem = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+hideOthersItem.keyEquivalentModifierMask = [.command, .option]
+appMenu.addItem(hideOthersItem)
+appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
 appMenu.addItem(.separator())
 appMenu.addItem(withTitle: "Quit Clutter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 let appMenuItem = NSMenuItem()
