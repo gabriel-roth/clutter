@@ -29,7 +29,7 @@ private let approve: @Sendable (URL) async throws -> URL = { url in
 @Test func clutterSignsInAsItsOwnSpotifyApp() {
     #expect(SpotifyAuthConfig.clutter.clientID == "45ae3a8fba3f4d4f801fbeaf67a64b03")
     #expect(SpotifyAuthConfig.clutter.redirectURI == "clutter://callback")
-    #expect(SpotifyAuthConfig.clutter.scopes == ["user-library-read", "user-library-modify"])
+    #expect(SpotifyAuthConfig.clutter.scopes == ["user-library-read", "user-library-modify", "user-read-playback-state", "user-modify-playback-state"])
     #expect(SpotifyAuthConfig.clutter.callbackScheme == "clutter")
 }
 

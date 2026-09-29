@@ -15,7 +15,7 @@ public struct SpotifyAuthConfig: Sendable {
     public static let clutter = SpotifyAuthConfig(
         clientID: "45ae3a8fba3f4d4f801fbeaf67a64b03",
         redirectURI: "clutter://callback",
-        scopes: ["user-library-read", "user-library-modify"]
+        scopes: ["user-library-read", "user-library-modify", "user-read-playback-state", "user-modify-playback-state"]
     )
 
     /// The scheme of `redirectURI`, which the web sign-in session watches for.

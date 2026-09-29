@@ -33,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let controller = ClutterController(
             store: LibraryStore(fileURL: LibraryStore.defaultDirectory.appending(path: "library.json")),
             artwork: artwork,
-            player: AppleScriptSpotifyPlayer(),
+            player: WebAPISpotifyPlayer(library: spotifyLibrary),
             screens: screens.isEmpty ? [CGRect(x: 0, y: 0, width: 1440, height: 900)] : screens,
             coverSize: CoverSize.saved(in: .standard),
             showsInfoOnHover: HoverInfo.isEnabled(in: .standard)

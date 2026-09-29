@@ -16,4 +16,4 @@ scripts/build-app.sh   # build build/Clutter.app
 open build/Clutter.app
 ```
 
-Clutter controls Spotify via AppleScript, so the first double-click may prompt you to allow Clutter to control Spotify (System Settings › Privacy & Security › Automation).
+Double-clicking a cover plays the album through Spotify's Web API, on the Spotify app running on this Mac, without bringing that app forward. This needs Spotify Premium; if Spotify isn't running, Clutter starts it hidden. Clutter reads the playing album through AppleScript, so the first use of Add Currently Playing Album may prompt you to allow Clutter to control Spotify (System Settings › Privacy & Security › Automation). The sign-in also asks for the `user-read-playback-state` and `user-modify-playback-state` scopes.

@@ -27,6 +27,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Clutter asks Spotify to play the album you double-click.</string>
+	<string>Clutter asks Spotify which album is playing, so it can add that album to your library.</string>
 </dict>
 </plist>

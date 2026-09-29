@@ -14,6 +14,20 @@ public struct SavedAlbum: Equatable, Sendable {
     }
 }
 
+/// A Spotify Connect device, such as the desktop app on one of the user's computers.
+public struct SpotifyDevice: Equatable, Sendable, Decodable {
+    /// Nil for devices Spotify won't let the Web API control.
+    public let id: String?
+    public let name: String
+    public let type: String
+
+    public init(id: String?, name: String, type: String) {
+        self.id = id
+        self.name = name
+        self.type = type
+    }
+}
+
 public enum SpotifyLibraryError: Error, Equatable {
     /// `retryAfter` is the Retry-After header's seconds, when the reply has a readable one.
     case requestFailed(status: Int, body: String, retryAfter: Int? = nil)
@@ -104,6 +118,21 @@ public struct SpotifyLibrary: Sendable {
         _ = try await send("DELETE", "me/library", query: [("uris", albumURI)])
     }
 
+    /// The devices Spotify can currently play on.
+    public func devices() async throws -> [SpotifyDevice] {
+        let data = try await send("GET", "me/player/devices", query: [])
+        guard let reply = try? JSONDecoder().decode(DevicesReply.self, from: data) else {
+            throw SpotifyLibraryError.malformedResponse
+        }
+        return reply.devices
+    }
+
+    /// Starts the album playing on the device, without touching the Spotify app's window.
+    public func play(albumURI: String, deviceID: String) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["context_uri": albumURI])
+        _ = try await request("PUT", "me/player/play", query: [("device_id", deviceID)], body: body)
+    }
+
     /// Saves the album, first removing it if it's already saved so it becomes the most recently added.
     /// After a remove, a failed save is tried twice more, since giving up would leave the album
     /// out of the library; if every try fails this throws `.removedButNotSaved`.
@@ -140,6 +169,7 @@ public struct SpotifyLibrary: Sendable {
     private func request(
         _ method: String, _ path: String, query: [(String, String)],
         headers: [String: String] = [:],
+        body: Data? = nil,
         cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy,
         accepting acceptedStatus: Int? = nil
     ) async throws -> (data: Data, response: HTTPURLResponse) {
@@ -150,7 +180,10 @@ public struct SpotifyLibrary: Sendable {
         for (field, value) in headers {
             request.setValue(value, forHTTPHeaderField: field)
         }
-        if method == "PUT" {
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        } else if method == "PUT" {
             request.httpBody = Data()  // Sends Content-Length: 0.
         }
         let token = try await accessToken()
@@ -183,6 +216,10 @@ public struct SpotifyLibrary: Sendable {
         }
         return decoder
     }
+}
+
+private struct DevicesReply: Decodable {
+    let devices: [SpotifyDevice]
 }
 
 /// One page of GET /me/albums. Each item decodes on its own, so one bad item doesn't spoil the page.
