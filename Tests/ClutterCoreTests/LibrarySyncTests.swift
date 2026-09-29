@@ -72,6 +72,17 @@ private func album(_ id: String) -> Album {
     #expect(harness.controller.windows[0].albumView.image == nil)
 }
 
+@MainActor @Test func aPlaceholderCoverPicksUpArtworkOnALaterRefresh() async {
+    let reply = (status: 200, body: page([item("a", addedAt: "2026-09-01T00:00:00Z")]))
+    let harness = Harness(replies: [reply, reply])
+    await harness.sync(failDownloads: true).refresh().value
+    let window = harness.controller.windows[0]
+    #expect(window.albumView.image == nil)
+    await harness.sync().refresh().value
+    #expect(harness.controller.windows[0] === window)
+    #expect(window.albumView.image != nil)
+}
+
 @MainActor @Test(arguments: [401, 500])
 func failedFetchLeavesTheDesktopAlone(status: Int) async {
     let saved = Library(entries: [.init(album: album("kept"), origin: CGPoint(x: 100, y: 100))])

@@ -2,7 +2,10 @@ import AppKit
 
 /// Shows one album cover. Drag to move the window; double-click to play.
 public final class AlbumView: NSView {
-    public let image: NSImage?
+    /// Nil shows a gray placeholder.
+    public var image: NSImage? {
+        didSet { needsDisplay = true }
+    }
     public var onDoubleClick: (() -> Void)?
     /// Called on every click, before dragging or playing.
     public var onMouseDown: (() -> Void)?

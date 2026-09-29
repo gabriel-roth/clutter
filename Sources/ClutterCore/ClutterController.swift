@@ -63,7 +63,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     /// Shows exactly `albums` (newest first): covers already shown stay where they are, the rest
     /// leave, and new ones appear at random spots above everything else, newest highest.
-    /// A cover whose album details changed is rebuilt in place.
+    /// A cover whose album details changed is rebuilt in place; a placeholder cover takes artwork cached since.
     public func apply(_ albums: [Album]) {
         library.reconcile(with: albums, newOrigin: randomOrigin)
         store.save(library)
@@ -74,6 +74,9 @@ public final class ClutterController: NSObject, NSWindowDelegate {
             if let window = candidates[entry.album.spotifyURI], window.album == entry.album {
                 candidates[entry.album.spotifyURI] = nil
                 reused.insert(ObjectIdentifier(window))
+                if window.albumView.image == nil {
+                    window.albumView.image = artwork.image(for: entry.album)
+                }
                 return window
             }
             return makeWindow(for: entry)
