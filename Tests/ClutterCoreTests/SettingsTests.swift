@@ -21,10 +21,10 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     #expect(settings.albumCountField.integerValue == 25)
     #expect(settings.albumCountStepper.integerValue == 25)
     #expect(settings.albumCountStepper.minValue == 1)
-    #expect(settings.albumCountStepper.maxValue == 100)
+    #expect(settings.albumCountStepper.maxValue == 200)
     let formatter = settings.albumCountField.formatter as? NumberFormatter
     #expect(formatter?.minimum == 1)
-    #expect(formatter?.maximum == 100)
+    #expect(formatter?.maximum == 200)
     #expect(allSubviews(of: settings.window.contentView).contains { $0 === settings.albumCountField })
 }
 
@@ -46,10 +46,10 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     let settings = SettingsWindowController(albumCount: 10, onAlbumCountChange: { reported.append($0) })
     settings.albumCountField.integerValue = 500
     settings.fieldChanged(settings.albumCountField)
-    #expect(settings.albumCountStepper.integerValue == 100)
-    #expect(settings.albumCountField.integerValue == 100)
+    #expect(settings.albumCountStepper.integerValue == 200)
+    #expect(settings.albumCountField.integerValue == 200)
     try await Task.sleep(for: SettingsWindowController.changeDelay + .milliseconds(300))
-    #expect(reported == [100])
+    #expect(reported == [200])
 }
 
 @MainActor @Test func settingTheSameCountDoesNotReport() async throws {

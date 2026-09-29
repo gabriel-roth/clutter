@@ -2,7 +2,7 @@ import Foundation
 
 /// How many of the most recently saved albums to show, chosen in Settings and remembered between launches.
 public enum AlbumCount {
-    public static let range = 1...100
+    public static let range = 1...200
     public static let defaultValue = 10
     static let defaultsKey = "albumCount"
 
