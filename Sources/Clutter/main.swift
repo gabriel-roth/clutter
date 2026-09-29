@@ -6,7 +6,7 @@ import KeyboardShortcuts
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let artwork = ArtworkStore(directory: LibraryStore.defaultDirectory.appending(path: "Artwork", directoryHint: .isDirectory))
     private var controller: ClutterController?
-    private lazy var settings = SettingsWindowController()
+    private lazy var settings = SettingsWindowController(albumCount: AlbumCount.saved(in: .standard), onAlbumCountChange: { AlbumCount.save($0, in: .standard) })
     private let spotifySignIn = SpotifySignIn(auth: SpotifyAuth())
 
     func applicationDidFinishLaunching(_ notification: Notification) {
