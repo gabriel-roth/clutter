@@ -6,7 +6,7 @@ The six albums are hard-coded in `Sources/ClutterCore/Album.swift`, with their a
 
 ## Build and run
 
-Requires macOS 14+ and the Swift toolchain (Xcode or the Command Line Tools).
+Requires macOS 14+ and Xcode.
 
 ```sh
 scripts/test.sh        # run the tests
