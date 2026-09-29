@@ -36,13 +36,13 @@ private func mouseDown(clickCount: Int) -> NSEvent {
 
 @MainActor @Test func windowIsABorderlessCoverThatCanBecomeKey() {
     let frame = CGRect(x: 100, y: 100, width: 220, height: 220)
-    let window = AlbumWindow(album: Album.all[0], image: nil, frame: frame)
+    let window = AlbumWindow(album: Album.starters[0], image: nil, frame: frame)
     #expect(window.styleMask == [.borderless])
     #expect(window.hasShadow)
     #expect(window.canBecomeKey)
     #expect(window.frame == frame)
     #expect(window.contentView === window.albumView)
-    #expect(window.album == Album.all[0])
+    #expect(window.album == Album.starters[0])
 }
 
 @MainActor @Test func firstClickOnAnInactiveCoverIsHandled() {

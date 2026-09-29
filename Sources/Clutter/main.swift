@@ -6,7 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let visibleFrame = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-        let controller = ClutterController(albums: Album.all, player: AppleScriptSpotifyPlayer(), visibleFrame: visibleFrame) { album in
+        let controller = ClutterController(albums: Album.starters, player: AppleScriptSpotifyPlayer(), visibleFrame: visibleFrame) { album in
             Bundle.main.image(forResource: album.artworkName)
         }
         controller.showWindows()

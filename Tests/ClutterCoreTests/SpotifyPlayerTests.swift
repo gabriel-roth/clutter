@@ -2,7 +2,7 @@ import Testing
 @testable import ClutterCore
 
 @Test func scriptPlaysTheAlbumURIAndRetriesWhileSpotifyStartsUp() {
-    let album = Album.all[2]
+    let album = Album.starters[2]
     #expect(AppleScriptSpotifyPlayer.script(for: album) == """
         tell application "Spotify"
             play track "spotify:album:2akjxkzFolkeV72Yyv5KrM"
