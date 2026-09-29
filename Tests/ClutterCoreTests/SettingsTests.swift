@@ -94,6 +94,27 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     #expect(reported.isEmpty)
 }
 
+@MainActor @Test func pressingReturnAfterTypingReportsRightAwayAndOnlyOnce() async throws {
+    var reported: [Int] = []
+    let settings = SettingsWindowController(albumCount: 10, onAlbumCountChange: { reported.append($0) })
+    settings.albumCountField.stringValue = "25"
+    settings.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: settings.albumCountField))
+    settings.fieldChanged(settings.albumCountField)
+    #expect(reported == [25])
+    try await Task.sleep(for: SettingsWindowController.changeDelay + .milliseconds(300))
+    #expect(reported == [25])
+}
+
+@MainActor @Test func pressingReturnAfterTheCountWasReportedDoesNotReportAgain() async throws {
+    var reported: [Int] = []
+    let settings = SettingsWindowController(albumCount: 10, onAlbumCountChange: { reported.append($0) })
+    settings.albumCountField.stringValue = "25"
+    settings.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: settings.albumCountField))
+    try await Task.sleep(for: SettingsWindowController.changeDelay + .milliseconds(300))
+    settings.fieldChanged(settings.albumCountField)
+    #expect(reported == [25])
+}
+
 @Test func addCurrentAlbumShortcutName() {
     #expect(KeyboardShortcuts.Name.addCurrentAlbum.rawValue == "addCurrentAlbum")
 }

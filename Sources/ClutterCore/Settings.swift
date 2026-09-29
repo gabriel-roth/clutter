@@ -22,7 +22,7 @@ private final class SettingsWindow: NSWindow {
 @MainActor
 public final class SettingsWindowController: NSObject {
     /// How long the album count must stay unchanged before it's reported, so stepping from 10 to 15
-    /// fetches once.
+    /// fetches once. Pressing Return in the field (or leaving it) reports without waiting.
     static let changeDelay: Duration = .milliseconds(500)
 
     public let window: NSWindow
@@ -30,6 +30,8 @@ public final class SettingsWindowController: NSObject {
     let albumCountStepper = NSStepper()
     let showsInfoOnHoverCheckbox = NSButton(checkboxWithTitle: "Show album info", target: nil, action: nil)
     private var albumCount: Int
+    /// The count `onAlbumCountChange` last got, or the starting count.
+    private var reportedAlbumCount: Int
     private let onAlbumCountChange: @MainActor (Int) -> Void
     private let onShowsInfoOnHoverChange: @MainActor (Bool) -> Void
     private var pendingChange: Task<Void, Never>?
@@ -43,6 +45,7 @@ public final class SettingsWindowController: NSObject {
         onShowsInfoOnHoverChange: @escaping @MainActor (Bool) -> Void = { _ in }
     ) {
         self.albumCount = albumCount
+        self.reportedAlbumCount = albumCount
         self.onAlbumCountChange = onAlbumCountChange
         self.onShowsInfoOnHoverChange = onShowsInfoOnHoverChange
         window = SettingsWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: true)
@@ -117,6 +120,7 @@ public final class SettingsWindowController: NSObject {
             return
         }
         setAlbumCount(value)
+        reportAlbumCount()
     }
 
     @objc func showsInfoOnHoverChanged(_ sender: NSButton) {
@@ -133,8 +137,17 @@ public final class SettingsWindowController: NSObject {
         pendingChange = Task { [weak self] in
             try? await Task.sleep(for: Self.changeDelay)
             guard !Task.isCancelled, let self else { return }
-            self.onAlbumCountChange(count)
+            self.reportAlbumCount()
         }
+    }
+
+    /// Reports the count now, if it hasn't been, instead of waiting for a pending report.
+    private func reportAlbumCount() {
+        pendingChange?.cancel()
+        pendingChange = nil
+        guard albumCount != reportedAlbumCount else { return }
+        reportedAlbumCount = albumCount
+        onAlbumCountChange(albumCount)
     }
 }
 
