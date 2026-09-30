@@ -33,6 +33,17 @@ private let approve: @Sendable (URL) async throws -> URL = { url in
     #expect(SpotifyAuthConfig.clutter.callbackScheme == "clutter")
 }
 
+@Test func clientIDComesFromTheAppBundleWhenSet() {
+    #expect(SpotifyAuthConfig.clientID(from: ["SpotifyClientID": "MINE"]) == "MINE")
+}
+
+@Test func clientIDFallsBackToTheDefault() {
+    let fallback = SpotifyAuthConfig.defaultClientID
+    #expect(SpotifyAuthConfig.clientID(from: nil) == fallback)
+    #expect(SpotifyAuthConfig.clientID(from: [:]) == fallback)
+    #expect(SpotifyAuthConfig.clientID(from: ["SpotifyClientID": ""]) == fallback)
+}
+
 @Test func authorizationURLAsksForTheLibraryWithPKCE() {
     let auth = makeAuth(http: FakeHTTP([]))
     let url = auth.authorizationURL(pkce: PKCE(verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"), state: "STATE")

@@ -39,11 +39,10 @@ File › Add Currently Playing Album saves the playing album to your library. If
 You need macOS 14 or later and Xcode.
 
 1. Register an app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard). Add `clutter://callback` as a redirect URI.
-2. Put its client ID in `SpotifyAuthConfig.clutter`, in `Sources/ClutterCore/SpotifyAuth.swift`.
-3. Build and open the app:
+2. Build the app with its client ID, then open it:
 
 ```sh
-scripts/build-app.sh   # builds build/Clutter.app
+CLUTTER_SPOTIFY_CLIENT_ID=<your client ID> scripts/build-app.sh   # builds build/Clutter.app
 open build/Clutter.app
 ```
 

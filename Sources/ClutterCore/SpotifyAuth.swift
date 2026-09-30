@@ -12,8 +12,17 @@ public struct SpotifyAuthConfig: Sendable {
         self.scopes = scopes
     }
 
+    static let defaultClientID = "45ae3a8fba3f4d4f801fbeaf67a64b03"
+
+    /// The client ID in the app's Info.plist (`SpotifyClientID`, which `scripts/build-app.sh` sets from
+    /// `CLUTTER_SPOTIFY_CLIENT_ID`), or the default one if there is none.
+    static func clientID(from infoDictionary: [String: Any]?) -> String {
+        if let id = infoDictionary?["SpotifyClientID"] as? String, !id.isEmpty { return id }
+        return defaultClientID
+    }
+
     public static let clutter = SpotifyAuthConfig(
-        clientID: "45ae3a8fba3f4d4f801fbeaf67a64b03",
+        clientID: clientID(from: Bundle.main.infoDictionary),
         redirectURI: "clutter://callback",
         scopes: ["user-library-read", "user-library-modify", "user-read-playback-state", "user-modify-playback-state"]
     )
