@@ -84,3 +84,35 @@ extension CurrentAlbumFetcher {
         }
     )
 }
+
+/// Which app File › Add Currently Playing Album takes the album from.
+public enum CurrentAlbumSource: Sendable {
+    case spotify, swinsian
+
+    /// A playing app wins over a paused one, Swinsian when both play (else it could never win);
+    /// otherwise Spotify, which reports when nothing is playing.
+    public static func choose(spotifyState: String, swinsianState: String) -> CurrentAlbumSource {
+        if swinsianState == "playing" { return .swinsian }
+        if spotifyState == "playing" || spotifyState == "paused" { return .spotify }
+        if swinsianState == "paused" { return .swinsian }
+        return .spotify
+    }
+
+    /// Returns the app's player state ("playing", "paused" or "stopped"), or "" when it isn't
+    /// running. Never launches the app.
+    static func stateScript(for app: String) -> String {
+        """
+        if application "\(app)" is running then
+            tell application "\(app)" to return player state as text
+        end if
+        return ""
+        """
+    }
+
+    /// Asks Spotify and Swinsian what they're doing.
+    public static func current() async -> CurrentAlbumSource {
+        let spotify = await AppleScriptRunner.run(stateScript(for: "Spotify"))
+        let swinsian = await AppleScriptRunner.run(stateScript(for: "Swinsian"))
+        return choose(spotifyState: spotify, swinsianState: swinsian)
+    }
+}
