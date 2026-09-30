@@ -11,7 +11,7 @@ This app is inspired by the original Clutter for iTunes by Sprote Research. If y
 
 ## How it works
 
-- The covers are your newest saved albums. Choose how many (1–100, default 10) under Settings…
+- The covers are your newest saved albums. Choose how many (1–200, default 10) under Settings…
 - Double-click a cover to play the album on Spotify on your Mac.
 - To remove an album from your Spotify library, and hence from Clutter, hold Option while pointing at a cover, then click the close button.
 - Covers keep their positions and stacking order between launches. New covers appear at random spots on top.
