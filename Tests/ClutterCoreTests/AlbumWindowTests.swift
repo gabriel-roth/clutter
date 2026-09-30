@@ -26,6 +26,19 @@ private func mouseDown(clickCount: Int) -> NSEvent {
     #expect(view.isShowingInfo)
 }
 
+@MainActor @Test func bannerFlashesTwiceThenGoesDark() async throws {
+    let view = AlbumView(image: nil, artist: "A", title: "T")
+    view.showsInfoOnHover = false
+    var changes: [Bool] = []
+    view.onFlashingInfoChange = { changes.append($0) }
+    view.mouseDown(with: mouseDown(clickCount: 2))
+    let deadline = ContinuousClock.now + .seconds(5)
+    while changes.count < 4, ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(changes == [true, false, true, false])
+}
+
 @MainActor @Test func singleClickDoesNotFlashBanner() {
     let view = AlbumView(image: nil, artist: "A", title: "T")
     view.mouseDown(with: mouseDown(clickCount: 1))

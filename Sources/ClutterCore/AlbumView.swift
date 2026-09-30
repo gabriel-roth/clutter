@@ -48,10 +48,13 @@ public final class AlbumView: NSView {
     }
     /// True for a moment after a double-click, so the banner lights up even when hover info is off.
     private(set) var isFlashingInfo = false {
-        didSet { needsDisplay = true }
+        didSet { needsDisplay = true; if isFlashingInfo != oldValue { onFlashingInfoChange?(isFlashingInfo) } }
     }
-    static let flashDuration: TimeInterval = 0.25
-    private var flashTimer: Timer?
+    /// Tests watch the flash through this instead of sampling the clock.
+    var onFlashingInfoChange: ((Bool) -> Void)?
+    /// Seconds lit, dark, lit; the banner goes dark again after the last.
+    static let flashPattern: [TimeInterval] = [0.1, 0.08, 0.1]
+    private var flashTimers: [Timer] = []
     var isShowingInfo: Bool { (isHovering && showsInfoOnHover || isFlashingInfo) && !isConfirmingRemoval }
     var isShowingCloseButton: Bool { isHovering && isOptionDown && !isConfirmingRemoval }
 
@@ -269,15 +272,19 @@ public final class AlbumView: NSView {
         needsLayout = true
     }
 
-    /// Briefly inverts the banner to show a double-click was received.
+    /// Inverts the banner twice, echoing the double-click, to show it was received.
     private func flashInfo() {
+        flashTimers.forEach { $0.invalidate() }
         isFlashingInfo = true
-        flashTimer?.invalidate()
-        let timer = Timer(timeInterval: Self.flashDuration, repeats: false) { [weak self] _ in
-            self?.isFlashingInfo = false
+        var elapsed: TimeInterval = 0
+        flashTimers = Self.flashPattern.enumerated().map { index, duration in
+            elapsed += duration
+            let timer = Timer(timeInterval: elapsed, repeats: false) { [weak self] _ in
+                self?.isFlashingInfo = index % 2 == 1
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            return timer
         }
-        RunLoop.main.add(timer, forMode: .common)
-        flashTimer = timer
     }
 
     @objc private func confirmRemoval() {
