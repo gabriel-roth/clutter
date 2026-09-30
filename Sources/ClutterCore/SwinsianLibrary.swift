@@ -1,9 +1,15 @@
+import AppKit
 import CryptoKit
-import Foundation
 
 /// Albums from the Swinsian app, which are named by album artist and title since Swinsian has no album IDs.
 public enum SwinsianAlbum {
     static let uriPrefix = "swinsian:album:"
+    static let bundleIdentifier = "com.swinsian.Swinsian"
+
+    /// Checked before any script mentions Swinsian: compiling one on a Mac without it asks where it is.
+    public static func appIsRunning() -> Bool {
+        !NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).isEmpty
+    }
 
     /// `artist` is the album artist, or the track artist when the album has none.
     public static func album(title: String, artist: String) -> Album {

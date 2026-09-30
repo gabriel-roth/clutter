@@ -14,7 +14,7 @@ public struct SwinsianPlayer: AlbumPlayer {
 
     public init(
         runScript: @escaping @Sendable (String) async -> String = Self.runAppleScript,
-        isRunning: @escaping @Sendable () -> Bool = Self.swinsianIsRunning,
+        isRunning: @escaping @Sendable () -> Bool = SwinsianAlbum.appIsRunning,
         launch: @escaping @Sendable () -> Void = Self.launchSwinsianInBackground,
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
@@ -78,19 +78,13 @@ public struct SwinsianPlayer: AlbumPlayer {
         """
     }
 
-    nonisolated static let bundleIdentifier = "com.swinsian.Swinsian"
-
     public static let runAppleScript: @Sendable (String) async -> String = { await AppleScriptRunner.run($0) }
-
-    public static let swinsianIsRunning: @Sendable () -> Bool = {
-        !NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).isEmpty
-    }
 
     /// `open -g -j` starts the app without activating or showing it.
     public static let launchSwinsianInBackground: @Sendable () -> Void = {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-g", "-j", "-b", bundleIdentifier]
+        process.arguments = ["-g", "-j", "-b", SwinsianAlbum.bundleIdentifier]
         try? process.run()
     }
 }

@@ -112,7 +112,7 @@ public enum CurrentAlbumSource: Sendable {
     /// Asks Spotify and Swinsian what they're doing.
     public static func current() async -> CurrentAlbumSource {
         let spotify = await AppleScriptRunner.run(stateScript(for: "Spotify"))
-        let swinsian = await AppleScriptRunner.run(stateScript(for: "Swinsian"))
+        let swinsian = SwinsianAlbum.appIsRunning() ? await AppleScriptRunner.run(stateScript(for: "Swinsian")) : ""
         return choose(spotifyState: spotify, swinsianState: swinsian)
     }
 }
