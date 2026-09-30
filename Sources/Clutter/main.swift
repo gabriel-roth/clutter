@@ -152,12 +152,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func removeFromLibrary(_ album: Album) {
         Task {
             do {
-                try await spotifyLibrary.remove(albumURI: album.spotifyURI)
+                try await spotifyLibrary.remove(albumURI: album.uri)
             } catch {
                 NSLog("Clutter: couldn't remove %@ from the library: %@", album.title, String(describing: error))
                 NSSound.beep()
             }
-            controller?.finishRemoving(spotifyURI: album.spotifyURI)
+            controller?.finishRemoving(uri: album.uri)
             sync?.refresh()
         }
     }
@@ -170,7 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 let albumURI = try await CurrentAlbumFetcher.live.fetchAlbumURI()
                 try await spotifyLibrary.bumpToMostRecent(albumURI: albumURI)
                 await sync?.refresh().value
-                controller?.bringToFront(spotifyURI: albumURI)
+                controller?.bringToFront(uri: albumURI)
             } catch SpotifyLibraryError.removedButNotSaved {
                 let alert = NSAlert()
                 alert.messageText = "Couldn't save the album again"

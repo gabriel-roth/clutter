@@ -43,7 +43,7 @@ private struct Harness {
 }
 
 private func album(_ id: String) -> Album {
-    Album(title: "Title \(id)", artist: "Artist", spotifyURI: "spotify:album:\(id)", artworkName: id)
+    Album(title: "Title \(id)", artist: "Artist", uri: "spotify:album:\(id)", artworkName: id)
 }
 
 @MainActor @Test func refreshShowsTheFetchedAlbumsWithArtwork() async {

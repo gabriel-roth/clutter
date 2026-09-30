@@ -26,7 +26,7 @@ private func page(_ items: [String], next: String? = nil) -> String {
     #expect(request.url?.absoluteString == "https://api.spotify.com/v1/me/albums?limit=10&offset=0")
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer TOKEN")
     #expect(albums == [SavedAlbum(
-        album: Album(title: "Title a", artist: "Artist", spotifyURI: "spotify:album:a", artworkName: "a"),
+        album: Album(title: "Title a", artist: "Artist", uri: "spotify:album:a", artworkName: "a"),
         addedAt: Date(timeIntervalSince1970: 1_790_532_252),
         artworkURL: URL(string: "https://i.scdn.co/image/a-640")
     )])

@@ -40,7 +40,7 @@ struct SeededGenerator: RandomNumberGenerator {
 }
 
 @MainActor
-final class SpyPlayer: SpotifyPlayer {
+final class SpyPlayer: AlbumPlayer {
     var played: [Album] = []
     func play(_ album: Album) { played.append(album) }
 }

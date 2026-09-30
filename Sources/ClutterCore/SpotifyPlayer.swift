@@ -1,13 +1,8 @@
 import Foundation
 
-@MainActor
-public protocol SpotifyPlayer {
-    func play(_ album: Album)
-}
-
 /// Plays albums through Spotify's Web API, always on the Spotify app running on this Mac, and never
 /// brings that app to the front (its AppleScript and URL commands do).
-public struct WebAPISpotifyPlayer: SpotifyPlayer {
+public struct WebAPISpotifyPlayer: AlbumPlayer {
     private let library: SpotifyLibrary
     private let machineNames: [String]
     private let launchSpotify: @Sendable () -> Void
@@ -48,7 +43,7 @@ public struct WebAPISpotifyPlayer: SpotifyPlayer {
         // A device that's just appeared can answer 404 for a moment before it accepts playback.
         for attempt in 1...Self.playAttempts {
             do {
-                return try await library.play(albumURI: album.spotifyURI, deviceID: device)
+                return try await library.play(albumURI: album.uri, deviceID: device)
             } catch SpotifyLibraryError.requestFailed(404, _, _) where attempt < Self.playAttempts {
                 try await sleep(.seconds(1))
             }

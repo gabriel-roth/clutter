@@ -12,7 +12,7 @@ private func makeStore() -> LibraryStore {
 private func makeController(
     store: LibraryStore,
     artwork: ArtworkStore = ArtworkStore(directory: temporaryDirectory()),
-    player: SpotifyPlayer = SpyPlayer(),
+    player: AlbumPlayer = SpyPlayer(),
     coverSize: CoverSize = .medium
 ) -> ClutterController {
     ClutterController(store: store, artwork: artwork, player: player, screens: [screen], coverSize: coverSize, rng: SeededGenerator(seed: 3))
@@ -23,7 +23,7 @@ private func coverFrame(at origin: CGPoint, size: CoverSize = .medium) -> CGRect
 }
 
 private func album(_ id: String, title: String? = nil) -> Album {
-    Album(title: title ?? "Title \(id)", artist: "Artist", spotifyURI: "spotify:album:\(id)", artworkName: id)
+    Album(title: title ?? "Title \(id)", artist: "Artist", uri: "spotify:album:\(id)", artworkName: id)
 }
 private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
 
@@ -167,10 +167,10 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     let store = makeStore()
     store.save(Library(entries: [a, b, c].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))
     let controller = makeController(store: store)
-    controller.bringToFront(spotifyURI: b.spotifyURI)
+    controller.bringToFront(uri: b.uri)
     #expect(controller.windows.map(\.album) == [a, c, b])
     #expect(store.load()?.entries.map(\.album) == [a, c, b])
-    controller.bringToFront(spotifyURI: d.spotifyURI)
+    controller.bringToFront(uri: d.uri)
     #expect(controller.windows.map(\.album) == [a, c, b])
 }
 
@@ -210,7 +210,7 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
 
 @MainActor @Test func dropsLegacyStarterAlbumsAndSavesWithoutThem() {
     let store = makeStore()
-    let legacy = Album(title: "Hovvdy", artist: "Hovvdy", spotifyURI: "spotify:album:1jEwzUBvIlVPeOfqR3Ghr0", artworkName: "hovvdy")
+    let legacy = Album(title: "Hovvdy", artist: "Hovvdy", uri: "spotify:album:1jEwzUBvIlVPeOfqR3Ghr0", artworkName: "hovvdy")
     store.save(Library(entries: [
         .init(album: legacy, origin: CGPoint(x: 100, y: 300)),
         .init(album: a, origin: CGPoint(x: 700, y: 200)),
@@ -272,7 +272,7 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     controller.windows[0].albumView.onRemove?()
     controller.apply([b, a])
     #expect(controller.windows.map(\.album) == [b])
-    controller.finishRemoving(spotifyURI: a.spotifyURI)
+    controller.finishRemoving(uri: a.uri)
     controller.apply([b, a])
     #expect(controller.windows.map(\.album) == [b, a])
 }
@@ -301,7 +301,7 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     let controller = makeController(store: makeStore())
     controller.apply([a, b])
     controller.setHidden(true)
-    controller.bringToFront(spotifyURI: a.spotifyURI)
+    controller.bringToFront(uri: a.uri)
     #expect(!controller.isHidden)
     #expect(controller.windows.allSatisfy { $0.isVisible })
 }

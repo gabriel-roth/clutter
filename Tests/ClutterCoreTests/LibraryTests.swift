@@ -3,7 +3,7 @@ import Testing
 @testable import ClutterCore
 
 private func album(_ id: String, title: String? = nil) -> Album {
-    Album(title: title ?? "Title \(id)", artist: "Artist", spotifyURI: "spotify:album:\(id)", artworkName: id)
+    Album(title: title ?? "Title \(id)", artist: "Artist", uri: "spotify:album:\(id)", artworkName: id)
 }
 private let lorelei = album("lorelei")
 private let hovvdy = album("hovvdy")
@@ -17,13 +17,13 @@ private func counter() -> () -> CGPoint {
 
 @Test func moveUpdatesTheOrigin() {
     var library = Library(entries: [.init(album: lorelei, origin: .zero)])
-    library.move(spotifyURI: lorelei.spotifyURI, to: CGPoint(x: 300, y: 400))
+    library.move(uri: lorelei.uri, to: CGPoint(x: 300, y: 400))
     #expect(library.entries[0].origin == CGPoint(x: 300, y: 400))
 }
 
 @Test func moveOfAnUnknownAlbumChangesNothing() {
     var library = Library(entries: [.init(album: lorelei, origin: .zero)])
-    library.move(spotifyURI: hovvdy.spotifyURI, to: CGPoint(x: 1, y: 1))
+    library.move(uri: hovvdy.uri, to: CGPoint(x: 1, y: 1))
     #expect(library.entries == [Library.Entry(album: lorelei, origin: .zero)])
 }
 
@@ -85,19 +85,19 @@ private func counter() -> () -> CGPoint {
 
 @Test func bringToFrontMovesTheEntryToTheEnd() {
     var library = Library(entries: [.init(album: a, origin: .zero), .init(album: b, origin: .zero), .init(album: c, origin: .zero)])
-    library.bringToFront(spotifyURI: a.spotifyURI)
+    library.bringToFront(uri: a.uri)
     #expect(library.entries.map(\.album) == [b, c, a])
 }
 
 @Test func bringToFrontOfAnUnknownAlbumChangesNothing() {
     var library = Library(entries: [.init(album: a, origin: .zero)])
-    library.bringToFront(spotifyURI: d.spotifyURI)
+    library.bringToFront(uri: d.uri)
     #expect(library.entries.map(\.album) == [a])
 }
 
 @Test func removeDropsTheEntry() {
     var library = Library(entries: [a, b, c].map { .init(album: $0, origin: .zero) })
-    library.remove(spotifyURI: b.spotifyURI)
+    library.remove(uri: b.uri)
     #expect(library.entries.map(\.album) == [a, c])
 }
 
@@ -113,12 +113,13 @@ private func counter() -> () -> CGPoint {
     """
     let library = try JSONDecoder().decode(Library.self, from: Data(json.utf8))
     #expect(library.entries[0].rotation == 0)
+    #expect(library.entries[0].album.uri == "spotify:album:t")
     #expect(library.entries[0].origin == CGPoint(x: 3, y: 4))
 }
 
 @Test func placeSetsOriginAndRotation() {
     var library = Library(entries: [.init(album: lorelei, origin: .zero)])
-    library.place(spotifyURI: lorelei.spotifyURI, at: CGPoint(x: 5, y: 6), rotation: 12)
+    library.place(uri: lorelei.uri, at: CGPoint(x: 5, y: 6), rotation: 12)
     #expect(library.entries[0].origin == CGPoint(x: 5, y: 6) && library.entries[0].rotation == 12)
 }
 

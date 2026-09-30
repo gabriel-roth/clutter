@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ClutterCore
 
-private let album = Album(title: "Court and Spark", artist: "Joni Mitchell", spotifyURI: "spotify:album:2akjxkzFolkeV72Yyv5KrM", artworkName: "court-and-spark")
+private let album = Album(title: "Court and Spark", artist: "Joni Mitchell", uri: "spotify:album:2akjxkzFolkeV72Yyv5KrM", artworkName: "court-and-spark")
 
 private func devices(_ entries: [(id: String, name: String, type: String)]) -> String {
     let list = entries.map { #"{"id":"\#($0.id)","name":"\#($0.name)","type":"\#($0.type)","is_active":false}"# }
@@ -29,7 +29,7 @@ private func devices(_ entries: [(id: String, name: String, type: String)]) -> S
     #expect(play.httpMethod == "PUT")
     #expect(play.url?.absoluteString == "https://api.spotify.com/v1/me/player/play?device_id=mine")
     #expect(play.value(forHTTPHeaderField: "Content-Type") == "application/json")
-    #expect(play.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] } == ["context_uri": album.spotifyURI])
+    #expect(play.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] } == ["context_uri": album.uri])
 }
 
 @MainActor @Test func launchesSpotifyHiddenOnceAndWaitsForItsDevice() async throws {

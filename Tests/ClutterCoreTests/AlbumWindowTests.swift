@@ -73,7 +73,7 @@ private func mouseDown(clickCount: Int) -> NSEvent {
 
 @MainActor @Test func windowIsABorderlessCoverThatCanBecomeKey() {
     let frame = CGRect(x: 100, y: 100, width: 220, height: 220)
-    let album = Album(title: "T", artist: "A", spotifyURI: "spotify:album:t", artworkName: "t")
+    let album = Album(title: "T", artist: "A", uri: "spotify:album:t", artworkName: "t")
     let window = AlbumWindow(album: album, image: nil, frame: frame)
     #expect(window.styleMask == [.borderless])
     #expect(window.hasShadow)
@@ -158,7 +158,7 @@ private func bandHeight(of view: AlbumView) -> Int {
 }
 
 @MainActor @Test func windowGivesItsViewTheAlbumArtistAndTitle() {
-    let album = Album(title: "T", artist: "A", spotifyURI: "spotify:album:t", artworkName: "t")
+    let album = Album(title: "T", artist: "A", uri: "spotify:album:t", artworkName: "t")
     let window = AlbumWindow(album: album, image: nil, frame: CGRect(x: 0, y: 0, width: 160, height: 160))
     #expect(window.albumView.artist == "A")
     #expect(window.albumView.title == "T")
@@ -304,7 +304,7 @@ private func mouseDown(at point: CGPoint, clickCount: Int = 1) -> NSEvent {
 
 @MainActor @Test func aTurnedCoverSitsCenteredInATransparentWindowJustBigEnoughForIt() {
     let cover = CGRect(x: 100, y: 100, width: 220, height: 220)
-    let album = Album(title: "T", artist: "A", spotifyURI: "spotify:album:t", artworkName: "t")
+    let album = Album(title: "T", artist: "A", uri: "spotify:album:t", artworkName: "t")
     let window = AlbumWindow(album: album, image: nil, frame: cover, rotation: 15)
     #expect(!window.isOpaque && window.backgroundColor == .clear)
     #expect(window.frame == cover.insetBy(dx: -25, dy: -25))

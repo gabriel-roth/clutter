@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// The albums on the desktop and where each cover sits. Albums are identified by Spotify URI.
+/// The albums on the desktop and where each cover sits. Albums are identified by URI.
 public struct Library: Codable, Equatable, Sendable {
     public struct Entry: Codable, Equatable, Sendable {
         public var album: Album
@@ -31,18 +31,18 @@ public struct Library: Codable, Equatable, Sendable {
         self.entries = entries
     }
 
-    public func contains(spotifyURI: String) -> Bool {
-        entries.contains { $0.album.spotifyURI == spotifyURI }
+    public func contains(uri: String) -> Bool {
+        entries.contains { $0.album.uri == uri }
     }
 
-    public mutating func move(spotifyURI: String, to origin: CGPoint) {
-        guard let index = entries.firstIndex(where: { $0.album.spotifyURI == spotifyURI }) else { return }
+    public mutating func move(uri: String, to origin: CGPoint) {
+        guard let index = entries.firstIndex(where: { $0.album.uri == uri }) else { return }
         entries[index].origin = origin
     }
 
     /// Moves the cover and sets how far it's turned.
-    public mutating func place(spotifyURI: String, at origin: CGPoint, rotation: CGFloat) {
-        guard let index = entries.firstIndex(where: { $0.album.spotifyURI == spotifyURI }) else { return }
+    public mutating func place(uri: String, at origin: CGPoint, rotation: CGFloat) {
+        guard let index = entries.firstIndex(where: { $0.album.uri == uri }) else { return }
         entries[index].origin = origin
         entries[index].rotation = rotation
     }
@@ -51,21 +51,21 @@ public struct Library: Codable, Equatable, Sendable {
     /// origin and stacking order, taking any updated details. New ones are stacked on top, oldest
     /// first so the newest ends up frontmost, each at `newOrigin()`, turned by `newRotation()`.
     public mutating func reconcile(with albums: [Album], newOrigin: () -> CGPoint, newRotation: () -> CGFloat = { 0 }) {
-        let wanted = Dictionary(albums.map { ($0.spotifyURI, $0) }, uniquingKeysWith: { first, _ in first })
+        let wanted = Dictionary(albums.map { ($0.uri, $0) }, uniquingKeysWith: { first, _ in first })
         entries = entries.compactMap { entry in
-            wanted[entry.album.spotifyURI].map { Entry(album: $0, origin: entry.origin, rotation: entry.rotation) }
+            wanted[entry.album.uri].map { Entry(album: $0, origin: entry.origin, rotation: entry.rotation) }
         }
-        for album in albums.reversed() where !contains(spotifyURI: album.spotifyURI) {
+        for album in albums.reversed() where !contains(uri: album.uri) {
             entries.append(Entry(album: album, origin: newOrigin(), rotation: newRotation()))
         }
     }
 
-    public mutating func remove(spotifyURI: String) {
-        entries.removeAll { $0.album.spotifyURI == spotifyURI }
+    public mutating func remove(uri: String) {
+        entries.removeAll { $0.album.uri == uri }
     }
 
-    public mutating func bringToFront(spotifyURI: String) {
-        guard let index = entries.firstIndex(where: { $0.album.spotifyURI == spotifyURI }) else { return }
+    public mutating func bringToFront(uri: String) {
+        guard let index = entries.firstIndex(where: { $0.album.uri == uri }) else { return }
         entries.append(entries.remove(at: index))
     }
 }

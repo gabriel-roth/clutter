@@ -250,7 +250,7 @@ private struct SavedAlbumsPage: Decodable {
                 album: Album(
                     title: album.name,
                     artist: album.artists.map(\.name).joined(separator: ", "),
-                    spotifyURI: album.uri,
+                    uri: album.uri,
                     artworkName: album.id
                 ),
                 addedAt: addedAt,

@@ -3,7 +3,7 @@ import Testing
 @testable import ClutterCore
 
 private func artworkAlbum(_ id: String) -> Album {
-    Album(title: "T", artist: "A", spotifyURI: "spotify:album:\(id)", artworkName: id)
+    Album(title: "T", artist: "A", uri: "spotify:album:\(id)", artworkName: id)
 }
 
 @Test func missingLibraryFileLoadsAsNil() {
@@ -52,7 +52,7 @@ private func artworkAlbum(_ id: String) -> Album {
 
 @Test func savedArtworkLoadsFromTheDirectory() throws {
     let store = ArtworkStore(directory: temporaryDirectory())
-    let album = Album(title: "T", artist: "A", spotifyURI: "spotify:album:abc", artworkName: "abc")
+    let album = Album(title: "T", artist: "A", uri: "spotify:album:abc", artworkName: "abc")
     try store.save(jpegData(), for: album)
     #expect(FileManager.default.fileExists(atPath: store.directory.appending(path: "abc.jpg").path))
     #expect(store.image(for: album)?.size == CGSize(width: 4, height: 4))
@@ -60,7 +60,7 @@ private func artworkAlbum(_ id: String) -> Album {
 
 @Test func missingArtworkIsNil() {
     let store = ArtworkStore(directory: temporaryDirectory())
-    let album = Album(title: "T", artist: "A", spotifyURI: "spotify:album:nope", artworkName: "nope")
+    let album = Album(title: "T", artist: "A", uri: "spotify:album:nope", artworkName: "nope")
     #expect(store.image(for: album) == nil)
 }
 

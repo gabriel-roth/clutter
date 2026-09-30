@@ -23,7 +23,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     private let store: LibraryStore
     private let artwork: ArtworkStore
-    private let player: SpotifyPlayer
+    private let player: AlbumPlayer
     private let screens: [CGRect]
     private var rng: any RandomNumberGenerator
 
@@ -31,7 +31,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public init(
         store: LibraryStore,
         artwork: ArtworkStore,
-        player: SpotifyPlayer,
+        player: AlbumPlayer,
         screens: [CGRect],
         coverSize: CoverSize = .medium,
         showsInfoOnHover: Bool = true,
@@ -49,12 +49,12 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
         var library = store.load() ?? Library()
         // Starter albums from older versions were named by slug rather than Spotify ID; drop them.
-        let current = library.entries.filter { "spotify:album:" + $0.album.artworkName == $0.album.spotifyURI }
+        let current = library.entries.filter { "spotify:album:" + $0.album.artworkName == $0.album.uri }
         var changed = current.count != library.entries.count
         library = Library(entries: current)
         for entry in library.entries where !Placement.isVisible(frame(at: entry.origin), on: screens) {
             let spot = randomSpot()
-            library.place(spotifyURI: entry.album.spotifyURI, at: spot.origin, rotation: spot.rotation)
+            library.place(uri: entry.album.uri, at: spot.origin, rotation: spot.rotation)
             changed = true
         }
         self.library = library
@@ -109,7 +109,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
             let cover = window.coverFrame
             let origin = CGPoint(x: cover.minX, y: cover.maxY - size.points)
             window.setCover(frame: frame(at: origin), rotation: window.rotation)
-            library.move(spotifyURI: window.album.spotifyURI, to: origin)
+            library.move(uri: window.album.uri, to: origin)
         }
         store.save(library)
     }
@@ -131,7 +131,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     private func place(_ spots: [Placement.Spot]) {
         for (window, spot) in zip(windows, spots) {
             window.setCover(frame: frame(at: spot.origin), rotation: spot.rotation)
-            library.place(spotifyURI: window.album.spotifyURI, at: spot.origin, rotation: spot.rotation)
+            library.place(uri: window.album.uri, at: spot.origin, rotation: spot.rotation)
         }
         store.save(library)
     }
@@ -150,17 +150,17 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         // A new cover's turn is chosen before its origin, which must leave room for the turn.
         var pending: Placement.Spot?
         library.reconcile(
-            with: albums.filter { !removing.contains($0.spotifyURI) },
+            with: albums.filter { !removing.contains($0.uri) },
             newOrigin: { let spot = randomSpot(); pending = spot; return spot.origin },
             newRotation: { pending?.rotation ?? 0 }
         )
         store.save(library)
         let old = windows
-        var candidates = Dictionary(old.map { ($0.album.spotifyURI, $0) }, uniquingKeysWith: { first, _ in first })
+        var candidates = Dictionary(old.map { ($0.album.uri, $0) }, uniquingKeysWith: { first, _ in first })
         var reused = Set<ObjectIdentifier>()
         windows = library.entries.map { entry in
-            if let window = candidates[entry.album.spotifyURI], window.album == entry.album {
-                candidates[entry.album.spotifyURI] = nil
+            if let window = candidates[entry.album.uri], window.album == entry.album {
+                candidates[entry.album.uri] = nil
                 reused.insert(ObjectIdentifier(window))
                 if window.albumView.image == nil {
                     window.albumView.image = artwork.image(for: entry.album)
@@ -175,8 +175,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     }
 
     /// Brings the album's cover to the front, showing the covers first if they were hidden.
-    public func bringToFront(spotifyURI: String) {
-        guard let window = windows.first(where: { $0.album.spotifyURI == spotifyURI }) else { return }
+    public func bringToFront(uri: String) {
+        guard let window = windows.first(where: { $0.album.uri == uri }) else { return }
         setHidden(false)
         window.orderFrontRegardless()
         moveToFront(window)
@@ -184,31 +184,31 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     /// Closes the album's cover and keeps it off the desktop until `finishRemoving` is called.
     public func remove(_ album: Album) {
-        removing.insert(album.spotifyURI)
-        library.remove(spotifyURI: album.spotifyURI)
+        removing.insert(album.uri)
+        library.remove(uri: album.uri)
         store.save(library)
         windows.removeAll { window in
-            guard window.album.spotifyURI == album.spotifyURI else { return false }
+            guard window.album.uri == album.uri else { return false }
             close(window)
             return true
         }
     }
 
     /// Lets `apply` show the album again, whether or not removing it from Spotify worked.
-    public func finishRemoving(spotifyURI: String) {
-        removing.remove(spotifyURI)
+    public func finishRemoving(uri: String) {
+        removing.remove(uri)
     }
 
     public func windowDidMove(_ notification: Notification) {
         guard let window = notification.object as? AlbumWindow else { return }
-        library.move(spotifyURI: window.album.spotifyURI, to: window.coverFrame.origin)
+        library.move(uri: window.album.uri, to: window.coverFrame.origin)
         store.save(library)
     }
 
     private func moveToFront(_ window: AlbumWindow) {
         guard let index = windows.firstIndex(where: { $0 === window }), index != windows.count - 1 else { return }
         windows.append(windows.remove(at: index))
-        library.bringToFront(spotifyURI: window.album.spotifyURI)
+        library.bringToFront(uri: window.album.uri)
         store.save(library)
     }
 
