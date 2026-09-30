@@ -21,19 +21,20 @@ public struct LibraryStore: Sendable {
             return try JSONDecoder().decode(Library.self, from: Data(contentsOf: fileURL))
         } catch {
             NSLog("Clutter: couldn't read %@: %@", fileURL.path, String(describing: error))
-            moveAsideUnreadableFile()
+            Self.moveAsideUnreadableFile(at: fileURL)
             return nil
         }
     }
 
-    private func moveAsideUnreadableFile() {
+    /// Moves `fileURL` to `<name>.unreadable`, replacing an earlier one.
+    static func moveAsideUnreadableFile(at fileURL: URL) {
         let aside = fileURL.deletingLastPathComponent().appending(path: fileURL.lastPathComponent + ".unreadable")
         do {
             if FileManager.default.fileExists(atPath: aside.path) {
                 try FileManager.default.removeItem(at: aside)
             }
             try FileManager.default.moveItem(at: fileURL, to: aside)
-            NSLog("Clutter: moved the unreadable library to %@", aside.path)
+            NSLog("Clutter: moved the unreadable file to %@", aside.path)
         } catch {
             NSLog("Clutter: couldn't move %@ aside: %@", fileURL.path, String(describing: error))
         }

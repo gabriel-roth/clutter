@@ -220,6 +220,13 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     #expect(store.load() == Library(entries: [.init(album: a, origin: CGPoint(x: 700, y: 200))]))
 }
 
+@MainActor @Test func keepsSwinsianAlbumsWhenRestoring() {
+    let store = makeStore()
+    let swinsian = SwinsianAlbum.album(title: "Hejira", artist: "Joni Mitchell")
+    store.save(Library(entries: [.init(album: swinsian, origin: CGPoint(x: 100, y: 300))]))
+    #expect(makeController(store: store).windows.map(\.album) == [swinsian])
+}
+
 @MainActor @Test func applyOrdersFrontOnlyNewCoversAndLeavesTheRestWhereTheyAre() {
     let store = makeStore()
     store.save(Library(entries: [a, b].map { .init(album: $0, origin: CGPoint(x: 100, y: 100)) }))

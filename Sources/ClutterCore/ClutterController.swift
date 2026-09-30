@@ -49,7 +49,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
         var library = store.load() ?? Library()
         // Starter albums from older versions were named by slug rather than Spotify ID; drop them.
-        let current = library.entries.filter { "spotify:album:" + $0.album.artworkName == $0.album.uri }
+        let current = library.entries.filter { SwinsianAlbum.isSwinsian($0.album) || "spotify:album:" + $0.album.artworkName == $0.album.uri }
         var changed = current.count != library.entries.count
         library = Library(entries: current)
         for entry in library.entries where !Placement.isVisible(frame(at: entry.origin), on: screens) {
