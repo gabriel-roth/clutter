@@ -34,6 +34,15 @@ These are in the View menu and the menu bar icon's menu.
 
 File › Add Currently Playing Album saves the playing album to your library. If it's already saved, it is saved again so it becomes the most recent. You can set a global shortcut for this under Settings…
 
+## Swinsian albums
+
+Clutter can also show albums from [Swinsian](https://swinsian.com). When Swinsian is playing, Add Currently Playing Album adds its album to Clutter instead. (If both apps are playing, Swinsian wins; if neither is, a paused Spotify wins over a paused Swinsian.)
+
+- Swinsian albums count toward the number of covers you chose, and take spots before Spotify albums do. The newest Swinsian albums are shown first.
+- Double-click a Swinsian cover to play the album in Swinsian. Clutter replaces Swinsian's playback queue with the album's tracks, in the order of Swinsian's current view. If Swinsian is showing a playlist that doesn't include the album, nothing plays.
+- Removing a Swinsian cover removes the album only from Clutter, not from Swinsian's library.
+- An album's tracks are found by their album title and album artist (or artist, when there's no album artist).
+
 ## Building the app
 
 You need macOS 14 or later and Xcode.

@@ -19,7 +19,7 @@
 		<command name="toggle covers" code="ClutTogl" description="Do what clicking the menu bar icon does: hide the covers if they're in front, show them if they're hidden, and bring them to the front if they're behind other windows.">
 			<cocoa class="ClutterToggleCoversCommand"/>
 		</command>
-		<command name="add current album" code="ClutAddA" description="Save the album playing in Spotify to the library, making it the most recent. Returns at once; the cover appears when Clutter has finished.">
+		<command name="add current album" code="ClutAddA" description="Add the album playing in Spotify or Swinsian, making it the most recent. Returns at once; the cover appears when Clutter has finished.">
 			<cocoa class="ClutterAddCurrentAlbumCommand"/>
 		</command>
 	</suite>

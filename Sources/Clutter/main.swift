@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let artwork = ArtworkStore(directory: LibraryStore.defaultDirectory.appending(path: "Artwork", directoryHint: .isDirectory))
     private let auth = SpotifyAuth()
     private lazy var spotifyLibrary = SpotifyLibrary(accessToken: { [auth] in try await auth.validAccessToken() })
+    private let swinsianLibrary = SwinsianLibrary(fileURL: LibraryStore.defaultDirectory.appending(path: "swinsian.json"))
     private lazy var spotifySignIn = SpotifySignIn(auth: auth)
     private var controller: ClutterController?
     /// The standard About panel isn't ours to subclass, so Command-W is handled by a key monitor.
@@ -33,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let controller = ClutterController(
             store: LibraryStore(fileURL: LibraryStore.defaultDirectory.appending(path: "library.json")),
             artwork: artwork,
-            player: WebAPISpotifyPlayer(library: spotifyLibrary),
+            player: RoutingPlayer(spotify: WebAPISpotifyPlayer(library: spotifyLibrary), swinsian: SwinsianPlayer()),
             screens: screens.isEmpty ? [CGRect(x: 0, y: 0, width: 1440, height: 900)] : screens,
             coverSize: CoverSize.saved(in: .standard),
             showsInfoOnHover: HoverInfo.isEnabled(in: .standard)
@@ -41,7 +42,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         controller.onRemoveAlbum = { [weak self] album in self?.removeFromLibrary(album) }
         controller.showWindows()
         self.controller = controller
-        let sync = LibrarySync(library: spotifyLibrary, artwork: artwork, controller: controller, albumCount: { AlbumCount.saved(in: .standard) })
+        let sync = LibrarySync(
+            library: spotifyLibrary,
+            artwork: artwork,
+            controller: controller,
+            albumCount: { AlbumCount.saved(in: .standard) },
+            swinsianAlbums: { [swinsianLibrary] in swinsianLibrary.albums() }
+        )
         self.sync = sync
         Task {
             // The first check comes right away, so it also does the launch refresh.
@@ -147,12 +154,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
-    /// Removes an album whose cover was just closed from the Spotify library, then refreshes so
-    /// the next-newest album takes its place. If removing fails, the refresh brings the cover back.
+    /// Removes an album whose cover was just closed from the Spotify library, or a Swinsian album
+    /// from Clutter's list of them (Swinsian's library is left alone), then refreshes so the
+    /// next-newest album takes its place. If removing fails, the refresh brings the cover back.
     private func removeFromLibrary(_ album: Album) {
         Task {
             do {
-                try await spotifyLibrary.remove(albumURI: album.uri)
+                if SwinsianAlbum.isSwinsian(album) {
+                    swinsianLibrary.remove(uri: album.uri)
+                } else {
+                    try await spotifyLibrary.remove(albumURI: album.uri)
+                }
             } catch {
                 NSLog("Clutter: couldn't remove %@ from the library: %@", album.title, String(describing: error))
                 NSSound.beep()
@@ -164,8 +176,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Saves the playing album to the Spotify library (re-saving it if it's already there, so it
     /// becomes the most recent), then refreshes the desktop and brings its cover to the front.
+    /// When Swinsian is the one playing, adds its album instead (see `CurrentAlbumSource`).
     @objc func addCurrentAlbum(_ sender: Any?) {
         Task {
+            if await CurrentAlbumSource.current() == .swinsian {
+                return await addCurrentSwinsianAlbum()
+            }
             do {
                 let albumURI = try await CurrentAlbumFetcher.live.fetchAlbumURI()
                 try await spotifyLibrary.bumpToMostRecent(albumURI: albumURI)
@@ -182,6 +198,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 NSSound.beep()
             }
         }
+    }
+
+    /// Adds Swinsian's album, caching its cover, or makes it the most recent if it's already added.
+    private func addCurrentSwinsianAlbum() async {
+        guard let playing = await SwinsianNowPlaying.fetch() else {
+            NSLog("Clutter: Swinsian isn't playing an album")
+            return NSSound.beep()
+        }
+        if let cover = playing.artwork {
+            do {
+                try artwork.save(cover, for: playing.album)
+            } catch {
+                NSLog("Clutter: couldn't save the cover of %@: %@", playing.album.title, String(describing: error))
+            }
+        }
+        swinsianLibrary.add(playing.album)
+        await sync?.refresh().value
+        controller?.bringToFront(uri: playing.album.uri)
     }
 }
 
