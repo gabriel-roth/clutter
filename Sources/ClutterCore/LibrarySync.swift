@@ -1,6 +1,7 @@
 import Foundation
 
-/// Fetches the most recently saved albums, caches their covers, and shows them on the desktop.
+/// Fetches the most recently saved albums, caches their covers, and shows them on the desktop, along
+/// with the Swinsian albums, which take spots before Spotify's do.
 /// Only the latest refresh counts: starting one cancels any still running. Polling refreshes
 /// whenever the library changes.
 @MainActor
@@ -9,6 +10,7 @@ public final class LibrarySync {
     private let artwork: ArtworkStore
     private let controller: ClutterController
     private let albumCount: @MainActor () -> Int
+    private let swinsianAlbums: @MainActor () -> [SavedAlbum]
     private let download: @Sendable (URL) async throws -> Data
     private let sleep: @Sendable (Duration) async throws -> Void
     private var running: Task<Void, Never>?
@@ -21,6 +23,7 @@ public final class LibrarySync {
         artwork: ArtworkStore,
         controller: ClutterController,
         albumCount: @escaping @MainActor () -> Int,
+        swinsianAlbums: @escaping @MainActor () -> [SavedAlbum] = { [] },
         download: @escaping @Sendable (URL) async throws -> Data = LibrarySync.liveDownload,
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
@@ -28,6 +31,7 @@ public final class LibrarySync {
         self.artwork = artwork
         self.controller = controller
         self.albumCount = albumCount
+        self.swinsianAlbums = swinsianAlbums
         self.download = download
         self.sleep = sleep
     }
@@ -77,11 +81,15 @@ public final class LibrarySync {
     private func refresh(thenRemembering etag: String?) -> Task<Void, Never> {
         running?.cancel()
         let count = albumCount()
+        // Newest first. Every one's cover is kept, even those not shown for now.
+        let allSwinsian = swinsianAlbums()
+        let swinsian = allSwinsian.prefix(count)
+        let swinsianArtwork = Set(allSwinsian.map(\.album.artworkName))
         refreshesUnderway += 1
         let task = Task { [library, artwork, download, controller] in
             defer { self.refreshesUnderway -= 1 }
             do {
-                let saved = try await library.recentAlbums(count: count)
+                let saved = try await library.recentAlbums(count: count - swinsian.count)
                 await withTaskGroup(of: Void.self) { group in
                     for item in saved where !artwork.hasImage(for: item.album) {
                         guard let url = item.artworkURL else { continue }
@@ -95,8 +103,9 @@ public final class LibrarySync {
                     }
                 }
                 guard !Task.isCancelled else { return }
-                controller.apply(saved.map(\.album))
-                artwork.prune(keeping: Set(saved.map(\.album.artworkName)))
+                let shown = (saved + swinsian).sorted { $0.addedAt > $1.addedAt }
+                controller.apply(shown.map(\.album))
+                artwork.prune(keeping: Set(saved.map(\.album.artworkName)).union(swinsianArtwork))
                 if let etag { self.libraryETag = etag }
             } catch {
                 guard !Task.isCancelled else { return }
