@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 sync.startPolling(every: .seconds(30))
             }
         }
+        controller.onShownByToggle = { NSApp.activate() }
         KeyboardShortcuts.onKeyUp(for: .toggleClutter) { [weak self] in
             self?.controller?.toggle()
         }

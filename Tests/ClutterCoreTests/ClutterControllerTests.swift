@@ -315,6 +315,22 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     #expect(controller.windows.allSatisfy { $0.isVisible })
 }
 
+@MainActor @Test func toggleActivatesTheAppOnlyWhenItShowsCovers() {
+    let controller = makeController(store: makeStore())
+    controller.apply([a, b])
+    var activations = 0
+    controller.onShownByToggle = { activations += 1 }
+    controller.coversAreInFront = { false }
+    controller.toggle()
+    #expect(activations == 1)
+    controller.coversAreInFront = { true }
+    controller.toggle()
+    #expect(controller.isHidden)
+    #expect(activations == 1)
+    controller.toggle()
+    #expect(activations == 2)
+}
+
 @MainActor @Test func toggleHidesCoversThatAreInFrontAndShowsHiddenOnes() {
     let controller = makeController(store: makeStore())
     controller.apply([a, b])

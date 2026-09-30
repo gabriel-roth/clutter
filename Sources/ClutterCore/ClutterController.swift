@@ -11,6 +11,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public private(set) var windows: [AlbumWindow] = []
     /// Called after a cover's Remove button closes it, to take the album out of the Spotify library.
     public var onRemoveAlbum: ((Album) -> Void)?
+    /// Called when `toggle` shows the covers, so the app can become active and take keystrokes such as Command-Comma.
+    public var onShownByToggle: (() -> Void)?
     /// Whether the covers are hidden from the desktop; while they are, nothing orders a cover front.
     public private(set) var isHidden = false
     /// Albums whose covers were removed and whose removal from Spotify hasn't finished; `apply` leaves them out.
@@ -81,11 +83,19 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public func toggle() {
         if isHidden {
             setHidden(false)
+            takeFocus()
         } else if !windows.isEmpty, !coversAreInFront() {
             showWindows()
+            takeFocus()
         } else {
             setHidden(true)
         }
+    }
+
+    /// Makes the app active with the frontmost cover as its key window.
+    private func takeFocus() {
+        onShownByToggle?()
+        windows.last?.makeKey()
     }
 
     private func orderFront(_ window: AlbumWindow) {
