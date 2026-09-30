@@ -2,6 +2,8 @@
 
 Clutter is a macOS menu bar app that scatters your newest Spotify albums across your desktop. Each cover gets its own borderless window. There is no Dock icon.
 
+Inspired by the original Clutter for iTunes by Sprote Research. If you're the author, please contact me at gabe.roth@gmail.com.
+
 ## Requirements
 
 - macOS 14 or later
