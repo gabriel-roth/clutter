@@ -53,3 +53,5 @@ If you have an Apple Development certificate, the build script signs the app wit
 ## Scripting
 
 `tell application "Clutter" to get has key window` is true when one of Clutter's windows is the key window, which is when Command-comma opens Settings. Unlike `frontmost`, it is true after you click a cover even if another app still owns the menu bar.
+
+`tell application "Clutter" to toggle covers` does what clicking the menu bar icon does. `tell application "Clutter" to add current album` does what File › Add Currently Playing Album does, and returns at once.

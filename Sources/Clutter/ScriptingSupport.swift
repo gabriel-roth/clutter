@@ -6,3 +6,19 @@ extension NSApplication {
     /// the state in which Command-comma reaches Clutter's menu, and what `frontmost` can't report.
     @objc var clutterHasKeyWindow: Bool { keyWindow != nil }
 }
+
+@objc(ClutterToggleCoversCommand)
+final class ToggleCoversCommand: NSScriptCommand {
+    override func performDefaultImplementation() -> Any? {
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.toggleCovers() }
+        return nil
+    }
+}
+
+@objc(ClutterAddCurrentAlbumCommand)
+final class AddCurrentAlbumCommand: NSScriptCommand {
+    override func performDefaultImplementation() -> Any? {
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addCurrentAlbum(nil) }
+        return nil
+    }
+}

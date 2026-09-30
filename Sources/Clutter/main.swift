@@ -51,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         controller.onShownByToggle = { NSApp.activate() }
         KeyboardShortcuts.onKeyUp(for: .toggleClutter) { [weak self] in
-            self?.controller?.toggle()
+            self?.toggleCovers()
         }
         KeyboardShortcuts.onKeyUp(for: .addCurrentAlbum) { [weak self] in
             self?.addCurrentAlbum(nil)
@@ -118,6 +118,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func tidyCovers(_ sender: Any?) {
         controller?.tidy()
+    }
+
+    /// What the menu bar icon's click and the global shortcut do; also scriptable.
+    func toggleCovers() {
+        controller?.toggle()
     }
 
     @objc func scrambleCovers(_ sender: Any?) {
