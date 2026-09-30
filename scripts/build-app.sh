@@ -14,6 +14,7 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 if [ -n "${CLUTTER_SPOTIFY_CLIENT_ID:-}" ]; then
     /usr/libexec/PlistBuddy -c "Add :SpotifyClientID string $CLUTTER_SPOTIFY_CLIENT_ID" "$APP/Contents/Info.plist"
 fi
+cp Resources/Clutter.sdef "$APP/Contents/Resources/"
 cp Resources/AppIcon.icns Resources/MenuBarIcon.png Resources/MenuBarIcon@2x.png "$APP/Contents/Resources/"
 # Package resource bundles go in Contents/Resources, where Xcode's Bundle.module looks for them.
 for bundle in "$PRODUCTS"/*.bundle; do

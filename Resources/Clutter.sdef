@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<dictionary title="Clutter Terminology">
+	<suite name="Standard Suite" code="????" description="Common classes and commands for all applications.">
+		<command name="quit" code="aevtquit" description="Quit the application.">
+			<cocoa class="NSQuitCommand"/>
+		</command>
+		<class name="application" code="capp" description="Clutter's top-level scripting object.">
+			<cocoa class="NSApplication"/>
+			<property name="name" code="pnam" type="text" access="r" description="The name of the application."/>
+			<property name="version" code="vers" type="text" access="r" description="The version of the application."/>
+			<property name="has key window" code="ClKw" type="boolean" access="r"
+				description="Whether one of Clutter's windows is the key window, which is when Command-comma opens Settings. Unlike frontmost, this is true when a cover has been clicked even though another app still owns the menu bar.">
+				<cocoa key="clutterHasKeyWindow"/>
+			</property>
+		</class>
+	</suite>
+</dictionary>

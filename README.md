@@ -49,3 +49,7 @@ open build/Clutter.app
 To run the tests, use `scripts/test.sh`.
 
 If you have an Apple Development certificate, the build script signs the app with it. Otherwise macOS asks for your login password after each rebuild.
+
+## Scripting
+
+`tell application "Clutter" to get has key window` is true when one of Clutter's windows is the key window, which is when Command-comma opens Settings. Unlike `frontmost`, it is true after you click a cover even if another app still owns the menu bar.
