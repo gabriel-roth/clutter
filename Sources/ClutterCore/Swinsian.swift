@@ -2,25 +2,36 @@ import AppKit
 
 /// Plays albums in Swinsian without bringing it to the front, starting it hidden if it isn't running.
 ///
-/// Swinsian's AppleScript can't play a given track or add to the playback queue, but it can delete
-/// from the queue, and playing an empty queue fills it from whatever Swinsian's window is showing. So
-/// the queue is emptied and refilled (muted, stopped at once), everything not on the album is deleted,
-/// and what's left plays, in the order of Swinsian's current view.
+/// When Swinsian Remote is on, the album's tracks are sent to it by ID, in disc and track order.
+/// Otherwise, or if that fails, AppleScript does it the long way: Swinsian's AppleScript can't play a
+/// given track or add to the playback queue, but it can delete from the queue, and playing an empty
+/// queue fills it from whatever Swinsian's window is showing. So the queue is emptied and refilled
+/// (muted, stopped at once), everything not on the album is deleted, and what's left plays, in the
+/// order of Swinsian's current view.
 public struct SwinsianPlayer: AlbumPlayer {
     private let runScript: @Sendable (String) async -> String
     private let isRunning: @Sendable () -> Bool
     private let launch: @Sendable () -> Void
+    private let remoteEnabled: @Sendable () -> Bool
+    private let trackIDs: @Sendable (Album) async -> [Int]
+    private let playRemotely: @Sendable ([Int]) async throws -> Void
     private let sleep: @Sendable (Duration) async throws -> Void
 
     public init(
         runScript: @escaping @Sendable (String) async -> String = Self.runAppleScript,
         isRunning: @escaping @Sendable () -> Bool = SwinsianAlbum.appIsRunning,
         launch: @escaping @Sendable () -> Void = Self.launchSwinsianInBackground,
+        remoteEnabled: @escaping @Sendable () -> Bool = SwinsianRemote.isEnabled,
+        trackIDs: @escaping @Sendable (Album) async -> [Int] = SwinsianTracks.ids(for:),
+        playRemotely: @escaping @Sendable ([Int]) async throws -> Void = { try await SwinsianRemote().play(trackIDs: $0) },
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.runScript = runScript
         self.isRunning = isRunning
         self.launch = launch
+        self.remoteEnabled = remoteEnabled
+        self.trackIDs = trackIDs
+        self.playRemotely = playRemotely
         self.sleep = sleep
     }
 
@@ -36,7 +47,8 @@ public struct SwinsianPlayer: AlbumPlayer {
     }
 
     enum PlayError: Error, Equatable {
-        /// Swinsian's current view has none of the album's tracks, or Swinsian never answered.
+        /// Swinsian has none of the album's tracks (or, for AppleScript, its current view has none),
+        /// or Swinsian never answered.
         case albumNotFound
     }
 
@@ -47,9 +59,20 @@ public struct SwinsianPlayer: AlbumPlayer {
         let launched = !isRunning()
         if launched { launch() }
         let attempts = launched ? Self.launchAttempts : 1
+        let useRemote = remoteEnabled()
         for attempt in 1...attempts {
+            if attempt > 1 { try await sleep(.seconds(1)) }
+            if useRemote {
+                // No tracks means Swinsian hasn't got the album, or hasn't loaded its library yet.
+                let ids = await trackIDs(album)
+                if ids.isEmpty { continue }
+                do {
+                    return try await playRemotely(ids)
+                } catch {
+                    NSLog("Clutter: Swinsian Remote couldn't play %@, so using AppleScript: %@", album.title, String(describing: error))
+                }
+            }
             if await runScript(Self.playScript(for: album)) == "ok" { return }
-            if attempt < attempts { try await sleep(.seconds(1)) }
         }
         throw PlayError.albumNotFound
     }
@@ -86,6 +109,38 @@ public struct SwinsianPlayer: AlbumPlayer {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
         process.arguments = ["-g", "-j", "-b", SwinsianAlbum.bundleIdentifier]
         try? process.run()
+    }
+}
+
+/// Looks up an album's tracks in Swinsian's library through AppleScript.
+public enum SwinsianTracks {
+    /// The album's track IDs in disc and track order, or none if Swinsian hasn't got it or can't say.
+    public static func ids(for album: Album) async -> [Int] {
+        await AppleScriptRunner.run(script(for: album), parse: parseIDs)
+    }
+
+    /// Returns {track IDs, disc numbers, track numbers} of the album's tracks, as three lists.
+    static func script(for album: Album) -> String {
+        """
+        tell application "Swinsian"
+            set matching to a reference to (every track of music library whose album is \(AppleScriptText.quoted(album.title)) and album artist or artist is \(AppleScriptText.quoted(album.artist)))
+            return {id of matching, disc number of matching, track number of matching}
+        end tell
+        """
+    }
+
+    static func parseIDs(_ reply: NSAppleEventDescriptor?) -> [Int] {
+        guard let reply, reply.numberOfItems == 3,
+              let ids = reply.atIndex(1), let discs = reply.atIndex(2), let numbers = reply.atIndex(3) else { return [] }
+        // Missing disc and track numbers come back as `missing value`, which isn't a number.
+        func number(_ list: NSAppleEventDescriptor, _ index: Int) -> Int {
+            list.atIndex(index)?.stringValue.flatMap { Int($0) } ?? 0
+        }
+        let tracks = (0..<ids.numberOfItems).compactMap { offset -> (id: Int, disc: Int, number: Int)? in
+            guard let id = ids.atIndex(offset + 1)?.stringValue.flatMap({ Int($0) }) else { return nil }
+            return (id, number(discs, offset + 1), number(numbers, offset + 1))
+        }
+        return tracks.sorted { ($0.disc, $0.number) < ($1.disc, $1.number) }.map(\.id)
     }
 }
 
