@@ -33,6 +33,18 @@ final class NetworkSwinsianConnection: SwinsianRemoteConnection, @unchecked Send
         let parameters = NWParameters(tls: tls)
         parameters.requiredInterfaceType = .loopback
         let connection = NWConnection(to: endpoint, using: parameters)
+        // A connection that fails or times out would otherwise keep trying in the background.
+        do {
+            try await ready(connection, queue: queue)
+        } catch {
+            connection.cancel()
+            throw error
+        }
+        connection.stateUpdateHandler = nil
+        return NetworkSwinsianConnection(connection: connection, queue: queue)
+    }
+
+    private static func ready(_ connection: NWConnection, queue: DispatchQueue) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             let once = Once(continuation)
             connection.stateUpdateHandler = { state in
@@ -46,8 +58,6 @@ final class NetworkSwinsianConnection: SwinsianRemoteConnection, @unchecked Send
             connection.start(queue: queue)
             queue.asyncAfter(deadline: .now() + timeout) { once.resume(with: .failure(NetworkError.timedOut)) }
         }
-        connection.stateUpdateHandler = nil
-        return NetworkSwinsianConnection(connection: connection, queue: queue)
     }
 
     private static func findServer(queue: DispatchQueue) async throws -> NWEndpoint {

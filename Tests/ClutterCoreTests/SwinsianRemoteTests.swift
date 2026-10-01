@@ -182,3 +182,27 @@ func liveSwinsianRemoteAnswersANonceAndTurnsDownAWrongSecret() async throws {
     ]))
     #expect(hashReply.headers["Hash"] == nil)
 }
+
+/// Answers the nonce, then fails, as when Swinsian stops answering partway.
+private struct FailingConnection: SwinsianRemoteConnection {
+    let closes: Box<Int>
+    let sent = Box(0)
+
+    func send(_ request: Data) async throws -> SwinsianRemoteMessage.Reply {
+        sent.value += 1
+        if sent.value > 1 { throw URLError(.timedOut) }
+        return .init(status: "SWN/1.0 200 OK", headers: [:], body: Data())
+    }
+
+    func close() { closes.value += 1 }
+}
+
+@Test func aConnectionThatFailsPartwayIsClosed() async {
+    let closes = Box(0)
+    let remote = SwinsianRemote(
+        connect: { FailingConnection(closes: closes) },
+        secrets: .init(cached: { "S1" }, cache: { _ in }, fromSwinsian: { "S1" })
+    )
+    await #expect(throws: URLError.self) { try await remote.play(trackIDs: [1]) }
+    #expect(closes.value == 1)
+}

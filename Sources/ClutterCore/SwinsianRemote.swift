@@ -112,35 +112,41 @@ public struct SwinsianRemote: Sendable {
         var readSwinsian = false
         while true {
             let session = Session(connection: try await connect())
-            let nonce = Self.makeNonce()
-            let nonceReply = try await session.send("NONCE", "/", headers: [
-                ("Device-UUID", Self.deviceUUID), ("Device-Name", Self.deviceName), ("Nonce", nonce),
-            ])
-            guard nonceReply.isOK else {
+            do {
+                if let signedIn = try await signIn(session, secret: &secret, readSwinsian: &readSwinsian) { return signedIn }
+            } catch {
                 session.connection.close()
-                throw RemoteError.unexpectedReply(nonceReply.status)
-            }
-            if secret == nil && !readSwinsian {
-                secret = await secrets.fromSwinsian()
-                readSwinsian = true
-            }
-            guard let tried = secret else {
-                session.connection.close()
-                throw RemoteError.notAuthorized
-            }
-            let hashReply = try await session.send("HASH", "/", headers: [("Hash", Self.proof(secret: tried, nonce: nonce))])
-            // A wrong proof still gets 200 OK, but only a right one gets Swinsian's own Hash back.
-            if hashReply.isOK && hashReply.headers["Hash"] != nil {
-                if readSwinsian { secrets.cache(tried) }
-                return session
+                throw error
             }
             session.connection.close()
-            guard !readSwinsian else { throw RemoteError.notAuthorized }
+        }
+    }
+
+    /// One try on a fresh connection: the session once signed in, or nil to try again with
+    /// Swinsian's secret, now in `secret`.
+    private func signIn(_ session: Session, secret: inout String?, readSwinsian: inout Bool) async throws -> Session? {
+        let nonce = Self.makeNonce()
+        let nonceReply = try await session.send("NONCE", "/", headers: [
+            ("Device-UUID", Self.deviceUUID), ("Device-Name", Self.deviceName), ("Nonce", nonce),
+        ])
+        guard nonceReply.isOK else { throw RemoteError.unexpectedReply(nonceReply.status) }
+        if secret == nil && !readSwinsian {
             secret = await secrets.fromSwinsian()
             readSwinsian = true
-            // Swinsian's secret is the same one that was just turned down.
-            if secret == tried { throw RemoteError.notAuthorized }
         }
+        guard let tried = secret else { throw RemoteError.notAuthorized }
+        let hashReply = try await session.send("HASH", "/", headers: [("Hash", Self.proof(secret: tried, nonce: nonce))])
+        // A wrong proof still gets 200 OK, but only a right one gets Swinsian's own Hash back.
+        if hashReply.isOK && hashReply.headers["Hash"] != nil {
+            if readSwinsian { secrets.cache(tried) }
+            return session
+        }
+        guard !readSwinsian else { throw RemoteError.notAuthorized }
+        secret = await secrets.fromSwinsian()
+        readSwinsian = true
+        // Swinsian's secret is the same one that was just turned down.
+        if secret == tried { throw RemoteError.notAuthorized }
+        return nil
     }
 
     /// Numbers each request on a connection.
