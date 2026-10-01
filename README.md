@@ -39,9 +39,22 @@ File › Add Currently Playing Album saves the playing album to your library. If
 Clutter can also show albums from [Swinsian](https://swinsian.com). When Swinsian is playing, Add Currently Playing Album adds its album to Clutter instead. (If both apps are playing, Swinsian wins; if neither is, a paused Spotify wins over a paused Swinsian.)
 
 - Swinsian albums count toward the number of covers you chose, and take spots before Spotify albums do. The newest Swinsian albums are shown first.
-- Double-click a Swinsian cover to play the album in Swinsian. Clutter replaces Swinsian's playback queue with the album's tracks, in the order of Swinsian's current view. If Swinsian is showing a playlist that doesn't include the album, nothing plays.
+- Double-click a Swinsian cover to play the album in Swinsian. Clutter replaces Swinsian's playback queue with the album's tracks.
+- Playing works best with Swinsian Remote turned on (see below): then the tracks play in disc and track order, whatever Swinsian is showing. Without it, Clutter uses AppleScript, the tracks play in the order of Swinsian's current view, and if Swinsian is showing a playlist that doesn't include the album, nothing plays.
 - Removing a Swinsian cover removes the album only from Clutter, not from Swinsian's library.
 - An album's tracks are found by their album title and album artist (or artist, when there's no album artist).
+
+### Swinsian Remote
+
+Swinsian Remote is a server built into Swinsian for its iPhone remote app. Its settings tab is hidden; to show it, quit Swinsian and run:
+
+```sh
+defaults write com.swinsian.Swinsian ShowRemotePreferences -bool YES
+```
+
+Then open Swinsian › Settings › Remote and check "Allow Swinsian Remote to control playback". The first time Clutter plays a Swinsian album this way, it appears under Allowed Devices as "Clutter", and macOS asks whether Clutter may use the "Swinsian Remote" item in your keychain. Choose Always Allow; Clutter then keeps its own copy. Clutter only connects to the Swinsian on this Mac.
+
+Swinsian Remote isn't documented, so a Swinsian update could change it. If it stops working, Clutter goes back to using AppleScript.
 
 ## Building the app
 
