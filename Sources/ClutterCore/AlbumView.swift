@@ -2,7 +2,7 @@ import AppKit
 
 /// Shows one album cover. Drag to move the window; double-click to play, which flashes the banner. Hovering shows the artist
 /// and title along the bottom, unless `showsInfoOnHover` is off. Hovering with Option held shows a
-/// close button, which asks whether to remove the album from the Spotify library.
+/// close button, which asks `removalQuestion` before removing the album.
 public final class AlbumView: NSView {
     /// Nil shows a gray placeholder.
     public var image: NSImage? {
@@ -10,6 +10,8 @@ public final class AlbumView: NSView {
     }
     public let artist: String
     public let title: String
+    /// Asked over the cover when the close button is clicked, above Cancel and Remove.
+    public let removalQuestion: String
     public var showsInfoOnHover = true {
         didSet { needsDisplay = true }
     }
@@ -64,10 +66,11 @@ public final class AlbumView: NSView {
     /// don't get `flagsChanged` events, and watching keys globally would need Accessibility access.
     private var modifierTimer: Timer?
 
-    public init(image: NSImage?, artist: String = "", title: String = "") {
+    public init(image: NSImage?, artist: String = "", title: String = "", removalQuestion: String = "Remove from Spotify library?") {
         self.image = image
         self.artist = artist
         self.title = title
+        self.removalQuestion = removalQuestion
         super.init(frame: .zero)
         removeButton.hasDestructiveAction = true
         cancelButton.keyEquivalent = "\u{1b}"
@@ -216,22 +219,22 @@ public final class AlbumView: NSView {
         cross.stroke()
     }
 
-    private static let confirmationText: NSAttributedString = {
+    var confirmationText: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
-        return NSAttributedString(string: "Remove from Spotify library?", attributes: [
+        return NSAttributedString(string: removalQuestion, attributes: [
             .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
             .foregroundColor: NSColor.white,
             .paragraphStyle: paragraph,
         ])
-    }()
+    }
     private static let confirmationSpacing: CGFloat = 10
 
     private var confirmationTextWidth: CGFloat { coverBounds.width - 20 }
 
     private var confirmationTextHeight: CGFloat {
         let size = NSSize(width: confirmationTextWidth, height: .greatestFiniteMagnitude)
-        return ceil(Self.confirmationText.boundingRect(with: size, options: .usesLineFragmentOrigin).height)
+        return ceil(confirmationText.boundingRect(with: size, options: .usesLineFragmentOrigin).height)
     }
 
     /// Dims the whole cover behind the question; the buttons are subviews, placed by `layout`.
@@ -242,7 +245,7 @@ public final class AlbumView: NSView {
             x: coverBounds.midX - confirmationTextWidth / 2, y: confirmationRowOrigin.y + confirmationRowHeight + Self.confirmationSpacing,
             width: confirmationTextWidth, height: confirmationTextHeight
         )
-        Self.confirmationText.draw(with: textRect, options: .usesLineFragmentOrigin)
+        confirmationText.draw(with: textRect, options: .usesLineFragmentOrigin)
     }
 
     private var confirmationRowHeight: CGFloat {

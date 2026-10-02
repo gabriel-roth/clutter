@@ -12,7 +12,9 @@ public final class AlbumWindow: NSWindow {
     /// `frame` is the cover's square, `rotation` how far it's turned, in degrees counterclockwise.
     public init(album: Album, image: NSImage?, frame: CGRect, rotation: CGFloat = 0) {
         self.album = album
-        self.albumView = AlbumView(image: image, artist: album.artist, title: album.title)
+        // Removing a Swinsian album only drops it from Clutter's own list; Swinsian's library is left alone.
+        let question = SwinsianAlbum.isSwinsian(album) ? "Remove from Clutter?" : "Remove from Spotify library?"
+        self.albumView = AlbumView(image: image, artist: album.artist, title: album.title, removalQuestion: question)
         self.rotation = rotation
         self.coverSize = frame.width
         super.init(contentRect: Self.windowFrame(cover: frame, rotation: rotation), styleMask: [.borderless], backing: .buffered, defer: false)

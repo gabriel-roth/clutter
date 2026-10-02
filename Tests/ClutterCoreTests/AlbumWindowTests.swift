@@ -371,3 +371,11 @@ private func mouseDown(at point: CGPoint, clickCount: Int = 1) -> NSEvent {
     #expect(rep.colorAt(x: 135, y: 135)?.alphaComponent == 1)
     #expect(rep.colorAt(x: 1, y: 1)?.alphaComponent == 0)
 }
+
+@MainActor @Test func removalAsksAboutSpotifyOnlyForSpotifyAlbums() {
+    let frame = CGRect(x: 0, y: 0, width: 160, height: 160)
+    let spotify = Album(title: "T", artist: "A", uri: "spotify:album:1", artworkName: "1")
+    #expect(AlbumWindow(album: spotify, image: nil, frame: frame).albumView.confirmationText.string == "Remove from Spotify library?")
+    let swinsian = SwinsianAlbum.album(title: "T", artist: "A")
+    #expect(AlbumWindow(album: swinsian, image: nil, frame: frame).albumView.confirmationText.string == "Remove from Clutter?")
+}
