@@ -30,6 +30,8 @@ These are in the View menu and the menu bar icon's menu.
 - **Tidy:** line the covers up in an even grid.
 - **Scramble:** scatter the covers in a messy jumble.
 
+New and scrambled covers are turned a little. To show every cover straight, uncheck Skew covers under Settings…; each cover remembers its turn, so checking it again restores it.
+
 ## Adding albums
 
 File › Add Currently Playing Album saves the playing album to your library. If it's already saved, it is saved again so it becomes the most recent. You can set a global shortcut for this under Settings…

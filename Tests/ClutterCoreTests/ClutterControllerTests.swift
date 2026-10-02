@@ -430,3 +430,38 @@ private let a = album("a"), b = album("b"), c = album("c"), d = album("d")
     #expect(controller.windows.allSatisfy { screen.contains($0.frame) })
     #expect(store.load()?.entries.map(\.rotation) == rotations)
 }
+
+@MainActor @Test func unskewedCoversShowStraightButKeepTheirSavedTurn() {
+    let store = makeStore()
+    store.save(Library(entries: [.init(album: a, origin: CGPoint(x: 300, y: 300), rotation: 7)]))
+    let controller = ClutterController(store: store, artwork: ArtworkStore(directory: temporaryDirectory()), player: SpyPlayer(), screens: [screen], skewsCovers: false, rng: SeededGenerator(seed: 3))
+    let window = controller.windows[0]
+    #expect(window.rotation == 0 && window.albumView.rotation == 0)
+    #expect(window.coverFrame == coverFrame(at: CGPoint(x: 300, y: 300)))
+    window.setFrameOrigin(CGPoint(x: window.frame.minX + 50, y: window.frame.minY + 20))
+    #expect(store.load()?.entries[0].rotation == 7)
+    controller.setSkewsCovers(true)
+    #expect(controller.windows[0].rotation == 7 && controller.windows[0].albumView.rotation == 7)
+    #expect(controller.windows[0].coverFrame == coverFrame(at: CGPoint(x: 350, y: 320)))
+    controller.setSkewsCovers(false)
+    #expect(controller.windows[0].rotation == 0)
+    #expect(controller.windows[0].coverFrame == coverFrame(at: CGPoint(x: 350, y: 320)))
+    #expect(store.load()?.entries[0].rotation == 7)
+}
+
+@MainActor @Test func unskewedCoversStayStraightWhenAddedScrambledOrResizedButSaveATurn() {
+    let store = makeStore()
+    let controller = ClutterController(store: store, artwork: ArtworkStore(directory: temporaryDirectory()), player: SpyPlayer(), screens: [screen], skewsCovers: false, rng: SeededGenerator(seed: 3))
+    controller.apply((0..<10).map { album("n\($0)") })
+    #expect(controller.windows.allSatisfy { $0.rotation == 0 })
+    #expect(store.load()!.entries.contains { $0.rotation != 0 })
+    controller.scramble()
+    #expect(controller.windows.allSatisfy { $0.rotation == 0 })
+    let scrambled = store.load()!.entries.map(\.rotation)
+    #expect(scrambled.contains { $0 != 0 })
+    controller.setCoverSize(.small)
+    #expect(controller.windows.allSatisfy { $0.rotation == 0 })
+    #expect(store.load()!.entries.map(\.rotation) == scrambled)
+    controller.setSkewsCovers(true)
+    #expect(controller.windows.map(\.rotation) == scrambled)
+}

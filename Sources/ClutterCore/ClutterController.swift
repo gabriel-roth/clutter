@@ -7,6 +7,8 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public private(set) var library: Library
     public private(set) var coverSize: CoverSize
     public private(set) var showsInfoOnHover: Bool
+    /// Whether covers are shown turned. Each cover's turn is saved in the library either way.
+    public private(set) var skewsCovers: Bool
     /// In stacking order, back to front, matching `library.entries`.
     public private(set) var windows: [AlbumWindow] = []
     /// Called after a cover's Remove button closes it, to take the album out of the Spotify library.
@@ -35,6 +37,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         screens: [CGRect],
         coverSize: CoverSize = .medium,
         showsInfoOnHover: Bool = true,
+        skewsCovers: Bool = true,
         rng: any RandomNumberGenerator = SystemRandomNumberGenerator()
     ) {
         self.store = store
@@ -43,6 +46,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
         self.screens = screens
         self.coverSize = coverSize
         self.showsInfoOnHover = showsInfoOnHover
+        self.skewsCovers = skewsCovers
         self.rng = rng
         self.library = Library()
         super.init()
@@ -130,7 +134,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     /// Moves and turns each cover, in stacking order, to the matching spot, and saves them.
     private func place(_ spots: [Placement.Spot]) {
         for (window, spot) in zip(windows, spots) {
-            window.setCover(frame: frame(at: spot.origin), rotation: spot.rotation)
+            window.setCover(frame: frame(at: spot.origin), rotation: shownRotation(spot.rotation))
             library.place(uri: window.album.uri, at: spot.origin, rotation: spot.rotation)
         }
         store.save(library)
@@ -140,6 +144,20 @@ public final class ClutterController: NSObject, NSWindowDelegate {
     public func setShowsInfoOnHover(_ showsInfo: Bool) {
         showsInfoOnHover = showsInfo
         windows.forEach { $0.albumView.showsInfoOnHover = showsInfo }
+    }
+
+    /// Shows every cover turned by its saved turn, or straight, leaving each where it is.
+    public func setSkewsCovers(_ skews: Bool) {
+        skewsCovers = skews
+        for window in windows {
+            let saved = library.entries.first { $0.album.uri == window.album.uri }?.rotation ?? 0
+            window.setCover(frame: window.coverFrame, rotation: shownRotation(saved))
+        }
+    }
+
+    /// How far a cover saved with `rotation` is shown turned.
+    private func shownRotation(_ rotation: CGFloat) -> CGFloat {
+        skewsCovers ? rotation : 0
     }
 
     /// Shows exactly `albums` (newest first): covers already shown stay where they are, neither moved
@@ -219,7 +237,7 @@ public final class ClutterController: NSObject, NSWindowDelegate {
 
     private func makeWindow(for entry: Library.Entry) -> AlbumWindow {
         let album = entry.album
-        let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: frame(at: entry.origin), rotation: entry.rotation)
+        let window = AlbumWindow(album: album, image: artwork.image(for: album), frame: frame(at: entry.origin), rotation: shownRotation(entry.rotation))
         window.albumView.showsInfoOnHover = showsInfoOnHover
         window.albumView.onDoubleClick = { [player] in player.play(album) }
         window.albumView.onMouseDown = { [weak self, weak window] in

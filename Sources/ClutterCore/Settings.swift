@@ -20,7 +20,7 @@ private final class SettingsWindow: NSWindow {
 }
 
 /// A small window for choosing the global shortcuts for showing or hiding the covers and for adding
-/// the current album, how many albums to show, and whether hovering shows album info.
+/// the current album, how many albums to show, whether hovering shows album info, and whether covers are turned.
 @MainActor
 public final class SettingsWindowController: NSObject {
     /// How long the album count must stay unchanged before it's reported, so stepping from 10 to 15
@@ -31,25 +31,30 @@ public final class SettingsWindowController: NSObject {
     let albumCountField = NSTextField()
     let albumCountStepper = NSStepper()
     let showsInfoOnHoverCheckbox = NSButton(checkboxWithTitle: "Show album info", target: nil, action: nil)
+    let skewsCoversCheckbox = NSButton(checkboxWithTitle: "Skew covers", target: nil, action: nil)
     private var albumCount: Int
     /// The count `onAlbumCountChange` last got, or the starting count.
     private var reportedAlbumCount: Int
     private let onAlbumCountChange: @MainActor (Int) -> Void
     private let onShowsInfoOnHoverChange: @MainActor (Bool) -> Void
+    private let onSkewsCoversChange: @MainActor (Bool) -> Void
     private var pendingChange: Task<Void, Never>?
 
-    /// `onAlbumCountChange` gets the new count once it settles, and `onShowsInfoOnHoverChange` the
-    /// checkbox's new state right away; each is responsible for saving its setting.
+    /// `onAlbumCountChange` gets the new count once it settles, and `onShowsInfoOnHoverChange` and
+    /// `onSkewsCoversChange` their checkbox's new state right away; each is responsible for saving its setting.
     public init(
         albumCount: Int,
         showsInfoOnHover: Bool = true,
+        skewsCovers: Bool = true,
         onAlbumCountChange: @escaping @MainActor (Int) -> Void = { _ in },
-        onShowsInfoOnHoverChange: @escaping @MainActor (Bool) -> Void = { _ in }
+        onShowsInfoOnHoverChange: @escaping @MainActor (Bool) -> Void = { _ in },
+        onSkewsCoversChange: @escaping @MainActor (Bool) -> Void = { _ in }
     ) {
         self.albumCount = albumCount
         self.reportedAlbumCount = albumCount
         self.onAlbumCountChange = onAlbumCountChange
         self.onShowsInfoOnHoverChange = onShowsInfoOnHoverChange
+        self.onSkewsCoversChange = onSkewsCoversChange
         window = SettingsWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: true)
         super.init()
 
@@ -82,6 +87,11 @@ public final class SettingsWindowController: NSObject {
         showsInfoOnHoverCheckbox.target = self
         showsInfoOnHoverCheckbox.action = #selector(showsInfoOnHoverChanged(_:))
 
+        skewsCoversCheckbox.state = skewsCovers ? .on : .off
+        skewsCoversCheckbox.imagePosition = .imageTrailing
+        skewsCoversCheckbox.target = self
+        skewsCoversCheckbox.action = #selector(skewsCoversChanged(_:))
+
         func shortcutRow(_ title: String, _ name: KeyboardShortcuts.Name) -> NSStackView {
             let row = NSStackView(views: [NSTextField(labelWithString: title), KeyboardShortcuts.RecorderCocoa(for: name)])
             row.orientation = .horizontal
@@ -94,6 +104,7 @@ public final class SettingsWindowController: NSObject {
             shortcutRow("Add currently playing album", .addCurrentAlbum),
             countRow,
             showsInfoOnHoverCheckbox,
+            skewsCoversCheckbox,
         ])
         rows.orientation = .vertical
         rows.alignment = .leading
@@ -132,6 +143,10 @@ public final class SettingsWindowController: NSObject {
 
     @objc func showsInfoOnHoverChanged(_ sender: NSButton) {
         onShowsInfoOnHoverChange(sender.state == .on)
+    }
+
+    @objc func skewsCoversChanged(_ sender: NSButton) {
+        onSkewsCoversChange(sender.state == .on)
     }
 
     private func setAlbumCount(_ count: Int) {

@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private lazy var settings = SettingsWindowController(
         albumCount: AlbumCount.saved(in: .standard),
         showsInfoOnHover: HoverInfo.isEnabled(in: .standard),
+        skewsCovers: SkewCovers.isEnabled(in: .standard),
         onAlbumCountChange: { [weak self] count in
             AlbumCount.save(count, in: .standard)
             self?.sync?.refresh()
@@ -26,6 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         onShowsInfoOnHoverChange: { [weak self] showsInfo in
             HoverInfo.save(showsInfo, in: .standard)
             self?.controller?.setShowsInfoOnHover(showsInfo)
+        },
+        onSkewsCoversChange: { [weak self] skews in
+            SkewCovers.save(skews, in: .standard)
+            self?.controller?.setSkewsCovers(skews)
         }
     )
 
@@ -37,7 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             player: RoutingPlayer(spotify: WebAPISpotifyPlayer(library: spotifyLibrary), swinsian: SwinsianPlayer()),
             screens: screens.isEmpty ? [CGRect(x: 0, y: 0, width: 1440, height: 900)] : screens,
             coverSize: CoverSize.saved(in: .standard),
-            showsInfoOnHover: HoverInfo.isEnabled(in: .standard)
+            showsInfoOnHover: HoverInfo.isEnabled(in: .standard),
+            skewsCovers: SkewCovers.isEnabled(in: .standard)
         )
         controller.onRemoveAlbum = { [weak self] album in self?.removeFromLibrary(album) }
         controller.showWindows()

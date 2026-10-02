@@ -142,6 +142,25 @@ private func allSubviews(of view: NSView?) -> [NSView] {
     #expect(settings.showsInfoOnHoverCheckbox.state == .off)
 }
 
+@MainActor @Test func skewCoversCheckboxShowsTheSettingAndReportsChanges() {
+    var reported: [Bool] = []
+    let settings = SettingsWindowController(albumCount: 10, skewsCovers: true, onSkewsCoversChange: { reported.append($0) })
+    #expect(settings.skewsCoversCheckbox.state == .on)
+    #expect(settings.skewsCoversCheckbox.title == "Skew covers")
+    #expect(settings.skewsCoversCheckbox.imagePosition == .imageTrailing)
+    #expect(allSubviews(of: settings.window.contentView).contains { $0 === settings.skewsCoversCheckbox })
+    settings.skewsCoversCheckbox.state = .off
+    settings.skewsCoversChanged(settings.skewsCoversCheckbox)
+    settings.skewsCoversCheckbox.state = .on
+    settings.skewsCoversChanged(settings.skewsCoversCheckbox)
+    #expect(reported == [false, true])
+}
+
+@MainActor @Test func skewCoversCheckboxStartsOffWhenTheSettingIsOff() {
+    let settings = SettingsWindowController(albumCount: 10, skewsCovers: false)
+    #expect(settings.skewsCoversCheckbox.state == .off)
+}
+
 @MainActor @Test func everyRowKeepsAMarginFromTheWindowsRightEdge() throws {
     let settings = SettingsWindowController(albumCount: 10)
     let rows = try #require(settings.window.contentView as? NSStackView)
