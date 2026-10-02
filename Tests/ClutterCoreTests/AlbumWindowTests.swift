@@ -244,7 +244,7 @@ private func mouseDown(at point: CGPoint, clickCount: Int = 1) -> NSEvent {
     #expect(!view.isShowingCloseButton)
 }
 
-@MainActor @Test func clickingTheCloseButtonAsksForConfirmationThatOutlastsOptionAndTheMouse() {
+@MainActor @Test func clickingTheCloseButtonAsksForConfirmationThatOutlastsOptionButNotTheMouse() {
     let keys = Box<NSEvent.ModifierFlags>([.option])
     let view = coverWithKeys(keys)
     var dragsOrClicks = 0
@@ -258,10 +258,29 @@ private func mouseDown(at point: CGPoint, clickCount: Int = 1) -> NSEvent {
     #expect(!view.removeButton.isHidden && !view.cancelButton.isHidden)
     keys.value = []
     view.updateModifierKeys()
-    view.mouseExited(with: enterExit(.mouseExited))
     #expect(view.isConfirmingRemoval)
     // The whole cover is dimmed, not just the bottom.
     #expect(topAndBottomBrightness(of: view).top < 0.5)
+    view.mouseExited(with: enterExit(.mouseExited))
+    #expect(!view.isConfirmingRemoval)
+    #expect(view.removeButton.isHidden && view.cancelButton.isHidden)
+}
+
+@MainActor @Test func movingOffATurnedCoverDismissesTheConfirmation() {
+    let view = AlbumView(image: nil)
+    view.frame = CGRect(x: 0, y: 0, width: 270, height: 270)
+    view.coverSide = 220
+    view.rotation = 15
+    func moved(to point: CGPoint) -> NSEvent {
+        NSEvent.mouseEvent(with: .mouseMoved, location: point, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
+    }
+    view.mouseMoved(with: moved(to: CGPoint(x: 135, y: 135)))
+    view.isConfirmingRemoval = true
+    view.mouseMoved(with: moved(to: CGPoint(x: 140, y: 130)))
+    #expect(view.isConfirmingRemoval)
+    view.mouseMoved(with: moved(to: CGPoint(x: 1, y: 1)))
+    #expect(!view.isConfirmingRemoval)
+    view.mouseExited(with: enterExit(.mouseExited))
 }
 
 @MainActor @Test func clickingElsewhereWithOptionHeldDoesNotAskForConfirmation() {

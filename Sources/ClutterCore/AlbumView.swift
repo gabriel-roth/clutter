@@ -33,13 +33,17 @@ public final class AlbumView: NSView {
     /// Where the Option key's state comes from; tests replace it.
     var modifierFlags: () -> NSEvent.ModifierFlags = { NSEvent.modifierFlags }
 
+    /// Leaving the cover also takes back the question about removing it.
     private var isHovering = false {
-        didSet { needsDisplay = true }
+        didSet {
+            needsDisplay = true
+            if !isHovering { isConfirmingRemoval = false }
+        }
     }
     private var isOptionDown = false {
         didSet { needsDisplay = true }
     }
-    /// Stays up, whatever the mouse and Option key do, until Remove or Cancel is clicked.
+    /// Stays up, whatever the Option key does, until Remove or Cancel is clicked or the pointer leaves the cover.
     var isConfirmingRemoval = false {
         didSet {
             removeButton.isHidden = !isConfirmingRemoval
