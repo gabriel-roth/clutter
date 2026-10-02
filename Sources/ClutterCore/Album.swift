@@ -13,6 +13,13 @@ public struct Album: Codable, Equatable, Sendable {
         self.artworkName = artworkName
     }
 
+    /// Spotify and Swinsian both credit compilations to "Various Artists", which isn't worth showing.
+    public var isCompilation: Bool { Self.isCompilation(artist: artist) }
+
+    static func isCompilation(artist: String) -> Bool {
+        artist.caseInsensitiveCompare("Various Artists") == .orderedSame
+    }
+
     /// Saved libraries name the URI `spotifyURI`, from before albums could come from Swinsian.
     enum CodingKeys: String, CodingKey {
         case title, artist, artworkName

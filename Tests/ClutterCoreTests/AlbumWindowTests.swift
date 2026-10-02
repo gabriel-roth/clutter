@@ -181,6 +181,23 @@ private func bandHeight(of view: AlbumView) -> Int {
     #expect(!AlbumView.artistFont.fontDescriptor.symbolicTraits.contains(.italic))
 }
 
+@MainActor @Test func compilationShowsOnlyItsTitleInABiggerItalic() {
+    let view = AlbumView(image: nil, artist: "Various Artists", title: "Nuggets")
+    #expect(view.infoText.string == "Nuggets")
+    let font = view.infoText.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+    #expect(font?.fontDescriptor.symbolicTraits.contains(.italic) == true)
+    #expect(font!.pointSize > AlbumView.titleFont.pointSize)
+}
+
+@MainActor @Test func albumShowsItsArtistOverItsTitle() {
+    #expect(AlbumView(image: nil, artist: "Artist", title: "Title").infoText.string == "Artist\nTitle")
+}
+
+@MainActor @Test func compilationWindowIsNamedByTitleAlone() {
+    let album = Album(title: "Nuggets", artist: "Various Artists", uri: "spotify:album:n", artworkName: "n")
+    #expect(AlbumWindow(album: album, image: nil, frame: CGRect(x: 0, y: 0, width: 160, height: 160)).title == "Nuggets")
+}
+
 /// A cover whose modifier keys are read from `keys` instead of the keyboard.
 @MainActor
 private func coverWithKeys(_ keys: Box<NSEvent.ModifierFlags>) -> AlbumView {

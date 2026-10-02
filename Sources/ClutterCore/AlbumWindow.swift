@@ -21,7 +21,7 @@ public final class AlbumWindow: NSWindow {
         contentView = albumView
         hasShadow = true
         isReleasedWhenClosed = false
-        title = "\(album.title) — \(album.artist)"
+        title = album.isCompilation ? album.title : "\(album.title) — \(album.artist)"
         albumView.coverSide = coverSize
         albumView.rotation = rotation
     }

@@ -143,28 +143,41 @@ public final class AlbumView: NSView {
     }
 
     static let artistFont = NSFont.systemFont(ofSize: 15, weight: .semibold)
-    static let titleFont: NSFont = {
-        let base = NSFont.systemFont(ofSize: 13)
-        return NSFont(descriptor: base.fontDescriptor.withSymbolicTraits(.italic), size: base.pointSize) ?? base
-    }()
+    static let titleFont = italicSystemFont(ofSize: 13)
+    /// A compilation shows no artist, so its title gets the artist's size.
+    static let compilationTitleFont = italicSystemFont(ofSize: 15)
 
-    /// Dims a band along the bottom, just tall enough for the artist over the title, which wrap and
-    /// truncate to fit the cover.
-    private func drawInfo() {
+    private static func italicSystemFont(ofSize size: CGFloat) -> NSFont {
+        let base = NSFont.systemFont(ofSize: size)
+        return NSFont(descriptor: base.fontDescriptor.withSymbolicTraits(.italic), size: size) ?? base
+    }
+
+    /// The artist over the title, or just the title, bigger, for a compilation.
+    var infoText: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         paragraph.lineBreakMode = .byWordWrapping
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+            .font: Self.titleFont,
+            .foregroundColor: NSColor.white.withAlphaComponent(0.85),
+            .paragraphStyle: paragraph,
+        ]
+        if Album.isCompilation(artist: artist) {
+            return NSAttributedString(string: title, attributes: titleAttributes.merging([.font: Self.compilationTitleFont]) { $1 })
+        }
         let text = NSMutableAttributedString(string: artist, attributes: [
             .font: Self.artistFont,
             .foregroundColor: NSColor.white,
             .paragraphStyle: paragraph,
         ])
-        text.append(NSAttributedString(string: "\n" + title, attributes: [
-            .font: Self.titleFont,
-            .foregroundColor: NSColor.white.withAlphaComponent(0.85),
-            .paragraphStyle: paragraph,
-        ]))
+        text.append(NSAttributedString(string: "\n" + title, attributes: titleAttributes))
+        return text
+    }
 
+    /// Dims a band along the bottom, just tall enough for the info text, which wraps and truncates
+    /// to fit the cover.
+    private func drawInfo() {
+        let text = NSMutableAttributedString(attributedString: infoText)
         if isFlashingInfo {
             text.addAttribute(.foregroundColor, value: NSColor.black, range: NSRange(location: 0, length: text.length))
         }

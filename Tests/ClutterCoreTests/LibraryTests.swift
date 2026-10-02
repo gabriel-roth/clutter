@@ -128,3 +128,9 @@ private func counter() -> () -> CGPoint {
     library.reconcile(with: [b, a], newOrigin: counter(), newRotation: { 4 })
     #expect(library.entries.map(\.rotation) == [9, 4])
 }
+
+@Test func variousArtistsAlbumIsACompilation() {
+    #expect(Album(title: "T", artist: "Various Artists", uri: "u", artworkName: "a").isCompilation)
+    #expect(Album(title: "T", artist: "various artists", uri: "u", artworkName: "a").isCompilation)
+    #expect(!Album(title: "T", artist: "The Beatles", uri: "u", artworkName: "a").isCompilation)
+}
