@@ -264,12 +264,15 @@ public final class AlbumView: NSView {
         cancelButton.frame.width + Self.buttonGap + removeButton.frame.width
     }
 
-    /// Centers the question above Cancel and Remove, side by side. The buttons stay upright, placed
-    /// where they'd fall on the turned cover.
+    /// Centers the question above Cancel and Remove, side by side. On a turned cover each button is
+    /// placed where it falls on the cover and turned with it about its own center.
     public override func layout() {
         super.layout()
-        removeButton.sizeToFit()
-        cancelButton.sizeToFit()
+        // Upright first, so sizing and `frame` describe the button itself rather than its turned bounding box.
+        for button in [removeButton, cancelButton] {
+            button.frameCenterRotation = 0
+            button.sizeToFit()
+        }
         let origin = confirmationRowOrigin
         let cancelSpot = NSPoint(x: origin.x, y: origin.y)
         let removeSpot = NSPoint(x: origin.x + cancelButton.frame.width + Self.buttonGap, y: origin.y)
@@ -278,7 +281,8 @@ public final class AlbumView: NSView {
                 button.setFrameOrigin(spot)
             } else {
                 let center = viewPoint(fromCoverPoint: NSPoint(x: spot.x + button.frame.width / 2, y: spot.y + button.frame.height / 2))
-                button.setFrameOrigin(NSPoint(x: (center.x - button.frame.width / 2).rounded(), y: (center.y - button.frame.height / 2).rounded()))
+                button.setFrameOrigin(NSPoint(x: center.x - button.frame.width / 2, y: center.y - button.frame.height / 2))
+                button.frameCenterRotation = rotation
             }
         }
     }

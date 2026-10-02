@@ -379,3 +379,21 @@ private func mouseDown(at point: CGPoint, clickCount: Int = 1) -> NSEvent {
     let swinsian = SwinsianAlbum.album(title: "T", artist: "A")
     #expect(AlbumWindow(album: swinsian, image: nil, frame: frame).albumView.confirmationText.string == "Remove from Clutter?")
 }
+
+@MainActor @Test func confirmationButtonsTurnWithTheCover() {
+    let view = AlbumView(image: nil)
+    view.frame = CGRect(x: 0, y: 0, width: 270, height: 270)
+    view.coverSide = 220
+    view.rotation = 15
+    view.isConfirmingRemoval = true
+    view.layoutSubtreeIfNeeded()
+    for button in [view.removeButton, view.cancelButton] {
+        #expect(abs(button.frameCenterRotation - 15) < 0.001)
+        #expect(view.hitTest(CGPoint(x: button.frame.midX, y: button.frame.midY)) === button)
+    }
+    view.rotation = 0
+    view.layoutSubtreeIfNeeded()
+    for button in [view.removeButton, view.cancelButton] {
+        #expect(button.frameCenterRotation == 0)
+    }
+}
