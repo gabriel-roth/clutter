@@ -71,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
-    /// A plain click shows or hides the covers; Command-click or right-click opens `menu`.
+    /// A plain click shows or hides the covers; right-click or Control-click opens `menu`.
     func installStatusItem(menu: NSMenu) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let icon = NSImage(named: "MenuBarIcon")
@@ -81,11 +81,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked(_:))
         statusItem = item
-        // The system claims Command-clicks on menu bar icons (for rearranging them) and never sends the
-        // button's action, but the mouse-down still reaches the app, so catch it here, along with right-clicks.
+        // The button only sends its action on mouse-up, so catch secondary clicks on their mouse-down here.
+        // (Command-click belongs to the system, which uses it to rearrange menu bar icons.)
         statusClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak item] event in
             guard let button = item?.button, event.window === button.window,
-                  event.type == .rightMouseDown || event.modifierFlags.contains(.command) else { return event }
+                  event.type == .rightMouseDown || event.modifierFlags.contains(.control) else { return event }
             // Attaching the menu just for this click gets the system's own placement under the icon,
             // which a popUp at a guessed point doesn't.
             item?.menu = menu
@@ -286,7 +286,7 @@ mainMenu.addItem(viewMenuItem)
 
 app.mainMenu = mainMenu
 
-// Clutter lives in the menu bar, not the Dock. Clicking the icon shows or hides the covers; Command-click opens this menu.
+// Clutter lives in the menu bar, not the Dock. Clicking the icon shows or hides the covers; right-click or Control-click opens this menu.
 let statusMenu = NSMenu()
 let statusAddItem = NSMenuItem(title: "Add Currently Playing Album", action: #selector(AppDelegate.addCurrentAlbum(_:)), keyEquivalent: "")
 statusAddItem.target = delegate

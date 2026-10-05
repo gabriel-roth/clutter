@@ -19,7 +19,7 @@ This app is inspired by the original Clutter for iTunes by Sprote Research. If y
 ## Menu bar icon
 
 - **Click:** hide or show all covers. If they're showing behind other windows, it brings them to the front.
-- **Command-click or right-click:** open the menu.
+- **Right-click or Control-click:** open the menu.
 - You can also set a global shortcut for this under Settings…
 
 ## Arranging covers
